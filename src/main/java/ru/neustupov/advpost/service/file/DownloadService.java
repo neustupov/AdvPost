@@ -5,8 +5,10 @@ import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 
@@ -35,5 +37,16 @@ public class DownloadService {
             throw new RuntimeException(e);
         }
         return file;
+    }
+
+    public InputStream downloadAsInputStream(URI uri) {
+        try (InputStream is = uri.toURL().openStream()){
+            log.info("Open stream for uri = {}", uri);
+            byte[] allBytes = is.readAllBytes();
+            log.info("Download file with size = {}", allBytes.length);
+            return new ByteArrayInputStream(allBytes);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

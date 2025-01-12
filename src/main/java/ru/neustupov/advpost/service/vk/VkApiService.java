@@ -11,6 +11,7 @@ import com.vk.api.sdk.objects.photos.Photo;
 import com.vk.api.sdk.objects.photos.PhotoSizes;
 import com.vk.api.sdk.objects.photos.responses.GetWallUploadServerResponse;
 import com.vk.api.sdk.objects.photos.responses.SaveWallPhotoResponse;
+import com.vk.api.sdk.objects.video.VideoFull;
 import com.vk.api.sdk.objects.wall.responses.GetResponse;
 import com.vk.api.sdk.objects.wall.responses.PostResponse;
 import com.vk.api.sdk.queries.wall.WallPostQuery;
@@ -21,24 +22,24 @@ import org.apache.http.HttpStatus;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ContentType;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.apache.http.impl.client.*;
+import ru.neustupov.advpost.model.AttachmentType;
 import ru.neustupov.advpost.model.PostStatus;
 import ru.neustupov.advpost.model.Attachment;
 import ru.neustupov.advpost.model.Post;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.vk.api.sdk.objects.users.Fields;
+import ru.neustupov.advpost.service.watermark.WaterMarkService;
 
 import static com.vk.api.sdk.objects.wall.GetFilter.SUGGESTS;
 
@@ -56,6 +57,11 @@ public class VkApiService {
     private String domain;
     private UserActor actor;
     private VkApiClient vk;
+    private final WaterMarkService waterMarkService;
+
+    public VkApiService(WaterMarkService waterMarkService) {
+        this.waterMarkService = waterMarkService;
+    }
 
     @PostConstruct
     public void setup() {
@@ -91,10 +97,14 @@ public class VkApiService {
                         Attachment attachment = Attachment.builder()
                                 .originalId(photo.getId())
                                 .originalUri(photoSizes.getUrl().toString())
+                                .type(AttachmentType.PHOTO)
                                 .build();
                         attachmentList.add(attachment);
                     }
                 }
+
+                VideoFull video = a.getVideo();
+                //TODO добавить обработку видео
             });
             Post post = Post.builder()
                     .originalPostId(p.getId())
@@ -125,40 +135,41 @@ public class VkApiService {
         }
     }
 
-    public JSONObject uploadPhotos(Map<Long, List<File>> precessedPhotos, GetWallUploadServerResponse photosServer) {
+    public JSONObject addWatermarkAndUploadPhotoAttachment(Post post, GetWallUploadServerResponse photosServer) {
 
         JSONObject jsonResult = null;
 
-        CloseableHttpClient httpClient = HttpClients.createDefault();
-        HttpPost uploadFile = new HttpPost(photosServer.getUploadUrl());
-        MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            HttpPost uploadFile = new HttpPost(photosServer.getUploadUrl());
+            MultipartEntityBuilder builder = MultipartEntityBuilder.create();
 
-        File file = null;
-        int count = 1;
-        for (Map.Entry<Long, List<File>> entry : precessedPhotos.entrySet()) {
-            for (File p : entry.getValue()) {
-                builder.addBinaryBody("file" + count, p);
-                HttpEntity multipart = builder.build();
-                uploadFile.setEntity(multipart);
-                count++;
-            }
-        }
+            int count = 1;
+            List<Attachment> attachments = post.getAttachments();
+            if (attachments != null && !attachments.isEmpty()) {
+                for (Attachment attachment : attachments) {
+                    byte[] watermarkToPhoto = waterMarkService.addImageWatermarkToPhoto(attachment);
+                    builder.addBinaryBody("file" + count, watermarkToPhoto, ContentType.IMAGE_JPEG, "file" + count + ".jpg");
+                    HttpEntity multipart = builder.build();
+                    uploadFile.setEntity(multipart);
+                    count++;
+                }
 
-        try {
-            CloseableHttpResponse response = httpClient.execute(uploadFile);
-            if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
-                BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-                String result;
-                while ((result = rd.readLine()) != null) {
-                    jsonResult = new JSONObject(result);
+                try {
+                    CloseableHttpResponse response = httpClient.execute(uploadFile);
+                    if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+                        BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+                        String result;
+                        while ((result = rd.readLine()) != null) {
+                            jsonResult = new JSONObject(result);
+                        }
+                    }
+                    return jsonResult;
+                } catch (ClientProtocolException ex) {
+                    log.error("ClientProtocolException -> {} {}", ex.getMessage(), ex);
                 }
             }
-            return jsonResult;
-        } catch (ClientProtocolException ex) {
-            ex.printStackTrace();
         } catch (IOException e) {
-            System.out.println("Exception with file + " + file.getName());
-            e.printStackTrace();
+            log.error("IOException -> {} {}", e.getMessage(), e);
         }
         return null;
     }

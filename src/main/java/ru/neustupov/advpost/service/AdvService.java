@@ -13,7 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import ru.neustupov.advpost.event.response.BotResponseEvent;
 import ru.neustupov.advpost.model.*;
-import ru.neustupov.advpost.s3.S3Service;
+import ru.neustupov.advpost.service.s3.S3Service;
 import ru.neustupov.advpost.service.postgres.MessageResponseService;
 import ru.neustupov.advpost.service.postgres.AttachmentService;
 import ru.neustupov.advpost.service.postgres.PostService;
@@ -21,8 +21,6 @@ import ru.neustupov.advpost.service.telegram.TelegramBotService;
 import ru.neustupov.advpost.service.vk.VkApiService;
 import ru.neustupov.advpost.service.watermark.WaterMarkService;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -64,17 +62,9 @@ public class AdvService {
         //Посмотрим в БД - если есть - пропускаем
         List<Post> posts = postService.processPosts(postList);
 
-        //Пройдем по фото в постах - скачаем и проверим по хешу, нет ли в БД, если есть - берем из БД
+        //Пройдем по фото в постах - скачаем и зальем в S3
         posts.forEach(post -> {
-            List<Attachment> photos = attachmentService.downloadPhotoAndSetHash(post);
-            //Заливаем в s3
-            photos.forEach(photo -> {
-                byte[] bytes = photo.getData();
-                if(bytes != null && bytes.length > 0) {
-                    String uploadFile = s3Service.uploadFile(photo.getName(), new ByteArrayInputStream(bytes), "image/jpeg");
-                    photo.setS3Uri(uploadFile);
-                }
-            });
+            List<Attachment> photos = attachmentService.processAttachments(post);
             attachmentService.saveAll(photos);
             post.setAttachments(photos);
         });
@@ -142,13 +132,11 @@ public class AdvService {
     }
 
     private boolean postWithWatermark(Post post) {
-        Map<Long, List<File>> precessedPhotos = waterMarkService.processPhoto(List.of(post));
-
         //Пошла жара по ВК
         //Получаем сервер для загрузки фото
         GetWallUploadServerResponse photosServer = vkApiService.getPhotosServer();
         //Загружаем фото с вотермарками на сервер
-        JSONObject uploadPhotos = vkApiService.uploadPhotos(precessedPhotos, photosServer);
+        JSONObject uploadPhotos = vkApiService.addWatermarkAndUploadPhotoAttachment(post, photosServer);
         String photoString = uploadPhotos.get("photo").toString();
         String serverString = uploadPhotos.get("server").toString();
         String hash = uploadPhotos.get("hash").toString();
@@ -166,7 +154,6 @@ public class AdvService {
 
     private Boolean postWithoutWatermark(Post post) {
         PostResponse response = vkApiService.postMessageFromSuggested(post);
-        //TODO нужно подгружать сами фото из S3 - иначе падает ошибка
         sendMessageToTG(post);
 
         //если что то пошло не так = false
@@ -180,16 +167,20 @@ public class AdvService {
     private List<MessageResponse> sendMessagesWithDelay(List<Post> posts) {
         List<MessageResponse> messageResponseList = new ArrayList<>();
         for(int i = 0; i < posts.size(); i++) {
-            Post vPost = posts.get(i);
-            String message = vPost.getId() + ". " + vPost.getMessage();
-            List<MessageResponse> responses = telegramBotService.sendMessage(vPost, message, notesChatId, PostStatus.PUBLISHED);
+            Post post = posts.get(i);
+            int postNumber = i + 1;
+            String message = "(" + postNumber + " из " + posts.size() + ") ID:" + post.getId() + " " + post.getMessage();
+            List<MessageResponse> responses = telegramBotService.sendMessage(post, message, notesChatId, PostStatus.PUBLISHED);
             messageResponseList.addAll(responses);
 
             boolean isLastPost = i == posts.size() - 1;
 
             //Сформируем инлайн клавиатуру и ждём откликов по постам - дальнейшая обработка после реакции в ТГ
-            List<MessageResponse> keyboardResponseList = telegramBotService.makeInlineKeyboardAndSendMessage(vPost, notesChatId);
-            messageResponseList.addAll(keyboardResponseList);
+            if(!responses.isEmpty()) {
+                messageResponseList.addAll(responses);
+                List<MessageResponse> keyboardResponseList = telegramBotService.makeInlineKeyboardAndSendMessage(post, notesChatId);
+                messageResponseList.addAll(keyboardResponseList);
+            }
             //Пауза межу постами - 15сек для всех кроме последнего
             if(!isLastPost) {
                 try {

@@ -1,6 +1,7 @@
-package ru.neustupov.advpost.s3;
+package ru.neustupov.advpost.service.s3;
 
 import io.minio.*;
+import io.minio.errors.*;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
@@ -8,7 +9,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 
 @Slf4j
 @Service
@@ -29,12 +33,13 @@ public class S3Service {
             if (!found) {
                 minioClient.makeBucket(MakeBucketArgs.builder().bucket(s3bucket).build());
             }
-            ObjectWriteResponse response = minioClient.putObject(
+            String uploadedAttachment = minioClient.putObject(
                     PutObjectArgs.builder().bucket(s3bucket).object(objectName).stream(
                                     inputStream, inputStream.available(), -1)
                             .contentType(contentType)
-                            .build());
-            return response.object();
+                            .build()).object();
+            log.info("Attachment with name = {} is uploaded to S3", objectName);
+            return uploadedAttachment;
         } catch (Exception e) {
             throw new RuntimeException("Error occurred: " + e.getMessage());
         }
@@ -53,5 +58,20 @@ public class S3Service {
             log.error(e.getMessage());
         }
         return file;
+    }
+
+    public InputStream getFileAsInputStream(String filename) {
+        try {
+            return minioClient.getObject(GetObjectArgs
+                                 .builder()
+                                 .bucket(s3bucket)
+                                 .object(filename)
+                                 .build());
+        } catch (ErrorResponseException | XmlParserException | ServerException | NoSuchAlgorithmException |
+                 IOException | InvalidResponseException | InvalidKeyException | InternalException |
+                 InsufficientDataException e) {
+            log.error(e.getMessage());
+        }
+        return null;
     }
 }

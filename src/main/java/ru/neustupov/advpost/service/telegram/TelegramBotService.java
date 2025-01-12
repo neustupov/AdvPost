@@ -2,6 +2,7 @@ package ru.neustupov.advpost.service.telegram;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.FileUtils;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.ParseMode;
 import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
@@ -20,9 +21,10 @@ import ru.neustupov.advpost.model.MessageResponse;
 import ru.neustupov.advpost.model.PostStatus;
 import ru.neustupov.advpost.model.Attachment;
 import ru.neustupov.advpost.model.Post;
+import ru.neustupov.advpost.service.s3.S3Util;
 import ru.neustupov.advpost.telegram.bot.AdvVkPostBot;
 
-import java.io.ByteArrayInputStream;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -32,10 +34,12 @@ import java.util.stream.Collectors;
 @Service
 public class TelegramBotService {
 
+    private final S3Util s3Util;
     private final AdvVkPostBot advVkPostBot;
     private final ChangePostStatusEventPublisher changePostStatusEventPublisher;
 
-    public TelegramBotService(AdvVkPostBot advVkPostBot, ChangePostStatusEventPublisher changePostStatusEventPublisher) {
+    public TelegramBotService(S3Util s3Util, AdvVkPostBot advVkPostBot, ChangePostStatusEventPublisher changePostStatusEventPublisher) {
+        this.s3Util = s3Util;
         this.advVkPostBot = advVkPostBot;
         this.changePostStatusEventPublisher = changePostStatusEventPublisher;
     }
@@ -79,19 +83,24 @@ public class TelegramBotService {
     }
 
     private List<MessageResponse> sendUserPhoto(String chatId, Post post, String message, Attachment attachment, PostStatus finalStatus) {
-        SendPhoto sendPhoto = SendPhoto.builder()
-                .chatId(chatId)
-                .photo(new InputFile(new ByteArrayInputStream(attachment.getData()), String.valueOf(attachment.getOriginalId())))
-                .caption(message)
-                .parseMode(ParseMode.MARKDOWN)
-                .build();
+        String s3Uri = attachment.getS3Uri();
+        try (InputStream inputStream = s3Util.download(s3Uri)) {
+            InputFile photo = new InputFile();
+            photo.setMedia(inputStream, String.valueOf(attachment.getOriginalId()));
+            SendPhoto sendPhoto = SendPhoto.builder()
+                    .chatId(chatId)
+                    .photo(photo)
+                    .caption(message)
+                    .parseMode(ParseMode.MARKDOWN)
+                    .build();
 
-        try {
             Message execute = advVkPostBot.execute(sendPhoto);
             changePostStatusEventPublisher.publishEvent(post, finalStatus);
             log.info("Send message with text => {}. And one attachment", message);
             MessageResponse messageResponse = new MessageResponse(post, execute);
             return List.of(messageResponse);
+        } catch (IOException e) {
+            log.error("Can`t download attachment with uri = {} from S3", s3Uri);
         } catch (TelegramApiException e) {
             log.error("Can't send attachment message", e);
         }
@@ -100,17 +109,24 @@ public class TelegramBotService {
 
     private List<MessageResponse> sendMediaGroup(String chatId, Post post, String message, List<Attachment> attachments, PostStatus finalStatus) {
         List<InputMedia> medias = attachments.stream()
-                .map(userContent -> {
-
-                    String mediaName = UUID.randomUUID().toString();
-
-                    return (InputMedia) InputMediaPhoto.builder()
-                            .media("attach://" + mediaName)
-                            .mediaName(mediaName)
-                            .isNewMedia(true)
-                            .newMediaStream(new ByteArrayInputStream(userContent.getData()))
-                            .parseMode(ParseMode.MARKDOWN)
-                            .build();
+                .map(attachment -> {
+                    String s3Uri = attachment.getS3Uri();
+                    try (InputStream inputStream = s3Util.download(s3Uri)) {
+                        String mediaName = UUID.randomUUID().toString();
+                        byte[] allBytes = inputStream.readAllBytes();
+                        try(ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(allBytes)) {
+                            return (InputMedia) InputMediaPhoto.builder()
+                                    .media("attach://" + mediaName)
+                                    .mediaName(mediaName)
+                                    .isNewMedia(true)
+                                    .newMediaStream(byteArrayInputStream)
+                                    .parseMode(ParseMode.MARKDOWN)
+                                    .build();
+                        }
+                    } catch (IOException e) {
+                        log.error("Can`t download attachment with uri = {} from S3", s3Uri);
+                    }
+                    return null;
                 }).collect(Collectors.toList());
 
         InputMedia media = medias.get(0);

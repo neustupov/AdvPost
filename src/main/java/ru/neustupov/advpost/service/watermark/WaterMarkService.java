@@ -1,92 +1,46 @@
 package ru.neustupov.advpost.service.watermark;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ru.neustupov.advpost.model.Attachment;
 import ru.neustupov.advpost.model.Post;
-import ru.neustupov.advpost.s3.S3Service;
+import ru.neustupov.advpost.service.s3.S3Util;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+
+import static ru.neustupov.advpost.service.postgres.AttachmentService.PHOTO_TYPE;
 
 @Slf4j
 @Service
 public class WaterMarkService {
 
-    @Value("${files.root}")
-    private String root;
+    private final S3Util s3Util;
 
-    private final S3Service s3Service;
-
-    public WaterMarkService(S3Service s3Service) {
-        this.s3Service = s3Service;
+    public WaterMarkService(S3Util s3Util) {
+        this.s3Util = s3Util;
     }
 
-    public Map<Long, List<File>> processPhoto(List<Post> posts) {
-        Map<Long, List<File>> fileMap = downloadAndGetPhoto(posts);
-        return addImageWatermarkToPhotos(posts, fileMap);
-    }
-
-    public Map<Long, List<File>> downloadAndGetPhoto(List<Post> attachments) {
-        Map<Long, List<File>> fileMap = new HashMap<>();
-        attachments.forEach(p -> {
-            List<Attachment> photos = p.getAttachments();
-            List<File> totalPhotos = new ArrayList<>();
-            //Фото уже в s3 - нужно достать оттуда
-            photos.forEach(photo -> {
-                String s3Uri = photo.getS3Uri();
-                File file = s3Service.getFile(s3Uri);
-                totalPhotos.add(file);
-            });
-            fileMap.put(p.getId(), totalPhotos);
-        });
-        return fileMap;
-    }
-
-    private Map<Long, List<File>> addImageWatermarkToPhotos(List<Post> posts, Map<Long, List<File>> attachments) {
-        Map<Long, List<File>> imageWithWatermarkMap = new HashMap<>();
-
-        for (Map.Entry<Long, List<File>> entry : attachments.entrySet()) {
-            Long k = entry.getKey();
-            List<File> v = entry.getValue();
-            List<File> precessedFiles = new ArrayList<>();
-            for (File f : v) {
-                String destFileName = "withWaterMark_" + f.getName();
-                File destinationFile = new File(root + destFileName);
-                File watermark = addImageWatermark(f, destinationFile);
-                precessedFiles.add(watermark);
-                posts.stream()
-                        .filter(post -> post.getId().equals(k))
-                        .findFirst()
-                        .flatMap(p -> p.getAttachments().stream()
-                                .filter(photo -> photo.getName().equals(f.getName()))
-                                .findFirst())
-                        .ifPresent(ph -> {
-                            try {
-                                byte[] data = Files.readAllBytes(watermark.toPath());
-                                ph.setData(data);
-                            } catch (IOException e) {
-                                log.error("Can`t read byte array from file with name = {}", f.getName());
-                            }
-                        });
-            }
-            imageWithWatermarkMap.put(k, precessedFiles);
+    public byte[] addImageWatermarkToPhoto(Attachment photo) {
+        String s3Uri = photo.getS3Uri();
+        try(InputStream inputStream = s3Util.download(s3Uri)) {
+            byte[] imageWatermark = addImageWatermark(inputStream);
+            //После того как наложили вотермарку - заливаем в S3 и проставляем ссылку в attachment
+            uploadToS3(photo, imageWatermark);
+            return imageWatermark;
+        } catch (IOException e) {
+            log.error("Can`t download file with uri = {} from S3", s3Uri);
         }
-        return imageWithWatermarkMap;
+        return null;
     }
 
-    private File addImageWatermark(File sourceImageFile, File destImageFile) {
+    private byte[] addImageWatermark(InputStream sourceImageFile) {
         try {
             BufferedImage sourceImage = ImageIO.read(sourceImageFile);
             int sourceImageWidth = sourceImage.getWidth();
@@ -121,13 +75,23 @@ public class WaterMarkService {
                     sourceImageWidth, sourceImageHeight, watermarkImageWidth, watermarkImageHeight, topLeftX, topLeftY);
 
             g2d.drawImage(watermarkImage, topLeftX, topLeftY, null);
-            ImageIO.write(sourceImage, "jpg", destImageFile);
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            ImageIO.write(sourceImage, "jpg", byteArrayOutputStream);
             g2d.dispose();
-
             log.info("The image watermark is added to the image.");
+            byte[] bytes = byteArrayOutputStream.toByteArray();
+            log.info("Image with watermark size = {}", bytes.length);
+            return bytes;
         } catch (IOException ex) {
             log.error(ex.getMessage());
         }
-        return destImageFile;
+        return null;
+    }
+
+    private void uploadToS3(Attachment photo, byte[] imageWatermark) {
+        String photoNameWithWatermark = "watermark_" + photo.getName();
+        String upload = s3Util.upload(photoNameWithWatermark, new ByteArrayInputStream(imageWatermark), PHOTO_TYPE);
+        photo.setS3Uri(upload);
+        log.info("Photo with watermark and name = {} is uploaded to S3", photoNameWithWatermark);
     }
 }

@@ -1,4 +1,4 @@
-package ru.neustupov.advpost.s3.configuration;
+package ru.neustupov.advpost.service.s3.configuration;
 
 import io.minio.MinioClient;
 import org.springframework.beans.factory.annotation.Value;

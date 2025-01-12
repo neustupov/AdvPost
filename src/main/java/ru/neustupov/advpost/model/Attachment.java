@@ -4,8 +4,13 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.DigestUtils;
 
+import java.io.IOException;
+import java.io.InputStream;
+
+@Slf4j
 @Entity
 @Builder
 @NoArgsConstructor
@@ -17,11 +22,9 @@ public class Attachment extends AbstractEntity {
     private Integer originalId;
     @Column(columnDefinition = "text")
     private String originalUri;
-    @Column(name = "s3Uri")
     private String s3Uri;
-    @Transient
-    private byte[] data;
     private String hash;
+    private AttachmentType type;
 
     public String getName() {
         return name;
@@ -55,24 +58,28 @@ public class Attachment extends AbstractEntity {
         this.s3Uri = s3Uri;
     }
 
-    public byte[] getData() {
-        return data;
-    }
-
-    public void setData(byte[] data) {
-        this.data = data;
-        setHash(getHashAsDigest(data));
-    }
-
     public String getHash() {
         return hash;
     }
 
-    public void setHash(String hash) {
-        this.hash = hash;
+    public void setHash(InputStream inputStream) {
+        this.hash = getHashAsDigest(inputStream);
     }
 
-    public String getHashAsDigest(byte[] data) {
-        return DigestUtils.appendMd5DigestAsHex(data, new StringBuilder()).toString();
+    public String getHashAsDigest(InputStream inputStream) {
+        try {
+            return DigestUtils.appendMd5DigestAsHex(inputStream, new StringBuilder()).toString();
+        } catch (IOException e) {
+            log.error(e.getMessage());
+        }
+        return null;
+    }
+
+    public AttachmentType getType() {
+        return type;
+    }
+
+    public void setType(AttachmentType type) {
+        this.type = type;
     }
 }
