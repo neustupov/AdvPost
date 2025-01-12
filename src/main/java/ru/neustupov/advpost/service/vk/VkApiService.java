@@ -1,0 +1,263 @@
+package ru.neustupov.advpost.service.vk;
+
+import com.vk.api.sdk.client.TransportClient;
+import com.vk.api.sdk.client.VkApiClient;
+import com.vk.api.sdk.client.actors.UserActor;
+import com.vk.api.sdk.exceptions.ApiException;
+import com.vk.api.sdk.exceptions.ClientException;
+import com.vk.api.sdk.httpclient.HttpTransportClient;
+import com.vk.api.sdk.objects.base.responses.OkResponse;
+import com.vk.api.sdk.objects.photos.Photo;
+import com.vk.api.sdk.objects.photos.PhotoSizes;
+import com.vk.api.sdk.objects.photos.responses.GetWallUploadServerResponse;
+import com.vk.api.sdk.objects.photos.responses.SaveWallPhotoResponse;
+import com.vk.api.sdk.objects.wall.responses.GetResponse;
+import com.vk.api.sdk.objects.wall.responses.PostResponse;
+import com.vk.api.sdk.queries.wall.WallPostQuery;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpStatus;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.apache.http.impl.client.HttpClients;
+import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.apache.http.impl.client.*;
+import ru.neustupov.advpost.model.PostStatus;
+import ru.neustupov.advpost.model.Attachment;
+import ru.neustupov.advpost.model.Post;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import com.vk.api.sdk.objects.users.Fields;
+
+import static com.vk.api.sdk.objects.wall.GetFilter.SUGGESTS;
+
+@Slf4j
+@Service
+public class VkApiService {
+
+    @Value("${vk.accessToken}")
+    private String accessToken;
+    @Value("${vk.userId}")
+    private Long userId;
+    @Value("${vk.groupId}")
+    private Long groupId;
+    @Value("${vk.domain}")
+    private String domain;
+    private UserActor actor;
+    private VkApiClient vk;
+
+    @PostConstruct
+    public void setup() {
+        TransportClient transportClient = new HttpTransportClient();
+        vk = new VkApiClient(transportClient);
+        actor = new UserActor(userId, accessToken);
+    }
+
+    public List<Post> getPosts() {
+        GetResponse getResponse;
+        try {
+            getResponse = vk.wall().get(actor)
+                    .domain(domain)
+                    .filter(SUGGESTS)
+                    .extended(true)
+                    .execute();
+        } catch (ApiException | ClientException e) {
+            throw new RuntimeException(e);
+        }
+
+        List<Post> postList = new ArrayList<>();
+        getResponse.getItems().forEach(p -> {
+            List<Attachment> attachmentList = new ArrayList<>();
+            p.getAttachments().forEach(a -> {
+                Photo photo = a.getPhoto();
+                if (photo != null) {
+                    List<PhotoSizes> sizes = photo.getSizes();
+                    if (sizes.size() > 0) {
+                        Integer h = sizes.stream().map(PhotoSizes::getHeight).sorted(Comparator.reverseOrder()).findFirst().get();
+                        Integer w = sizes.stream().map(PhotoSizes::getWidth).sorted(Comparator.reverseOrder()).findFirst().get();
+                        Integer t = h > w ? h : w;
+                        PhotoSizes photoSizes = sizes.stream().filter(sz -> ((sz.getHeight().equals(t)) || (sz.getWidth().equals(t)))).findFirst().get();
+                        Attachment attachment = Attachment.builder()
+                                .originalId(photo.getId())
+                                .originalUri(photoSizes.getUrl().toString())
+                                .build();
+                        attachmentList.add(attachment);
+                    }
+                }
+            });
+            Post post = Post.builder()
+                    .originalPostId(p.getId())
+                    .ownerId(p.getOwnerId())
+                    .fromId(p.getFromId())
+                    .message(p.getText().replaceAll("\\*", ""))
+                    .attachments(attachmentList)
+                    .status(PostStatus.NEW)
+                    .hash(p.getHash())
+                    .build();
+            postList.add(post);
+        });
+
+        AtomicInteger imageCount = new AtomicInteger();
+        postList.forEach(p -> imageCount.addAndGet(p.getAttachments().size()));
+        log.info("Get {} photos from attachments", imageCount.get());
+        return postList;
+    }
+
+    public GetWallUploadServerResponse getPhotosServer() {
+
+        try {
+            return vk.photos().getWallUploadServer(actor)
+                    .groupId(groupId)
+                    .execute();
+        } catch (ApiException | ClientException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public JSONObject uploadPhotos(Map<Long, List<File>> precessedPhotos, GetWallUploadServerResponse photosServer) {
+
+        JSONObject jsonResult = null;
+
+        CloseableHttpClient httpClient = HttpClients.createDefault();
+        HttpPost uploadFile = new HttpPost(photosServer.getUploadUrl());
+        MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+
+        File file = null;
+        int count = 1;
+        for (Map.Entry<Long, List<File>> entry : precessedPhotos.entrySet()) {
+            for (File p : entry.getValue()) {
+                builder.addBinaryBody("file" + count, p);
+                HttpEntity multipart = builder.build();
+                uploadFile.setEntity(multipart);
+                count++;
+            }
+        }
+
+        try {
+            CloseableHttpResponse response = httpClient.execute(uploadFile);
+            if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+                BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+                String result;
+                while ((result = rd.readLine()) != null) {
+                    jsonResult = new JSONObject(result);
+                }
+            }
+            return jsonResult;
+        } catch (ClientProtocolException ex) {
+            ex.printStackTrace();
+        } catch (IOException e) {
+            System.out.println("Exception with file + " + file.getName());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public List<SaveWallPhotoResponse> savePhoto(String photoString, String serverString, String hash) {
+
+        List<SaveWallPhotoResponse> photoResponses = null;
+        try {
+            photoResponses = vk.photos().saveWallPhoto(actor)
+                    .groupId(groupId)
+                    .photo(photoString)
+                    .server(Integer.parseInt(serverString))
+                    .hash(hash)
+                    .execute();
+            log.info("Photos saved on server");
+        } catch (ApiException | ClientException e) {
+            log.error(e.getMessage());
+        }
+        return photoResponses;
+    }
+
+    public PostResponse postMessageToWall(Post post, List<SaveWallPhotoResponse> attachments) {
+
+        String totalMessage = getMessageWithUserDataForVk(post);
+
+        try {
+            WallPostQuery query = vk.wall().post(actor)
+                    .ownerId(-groupId)
+                    .fromGroup(true)
+                    .message(totalMessage);
+            if (attachments != null && !attachments.isEmpty()) {
+                List<String> strings = attachments.stream().map(a -> "photo" + a.getOwnerId() + "_" + a.getId()).toList();
+                query.attachments(strings);
+            }
+            PostResponse postResponse = query.execute();
+            log.info("Post message to VK with id = {}", postResponse.getPostId());
+            return postResponse;
+        } catch (ApiException | ClientException e) {
+            log.error("Can`t post to wall for vkPost with id = {}", post.getId());
+        }
+        return null;
+    }
+
+    public PostResponse postMessageFromSuggested(Post post) {
+        try {
+            WallPostQuery query = vk.wall().post(actor)
+                    .ownerId(-groupId)
+                    .fromGroup(true)
+                    .signed(true)
+                    .postId(post.getOriginalPostId());
+            PostResponse postResponse = query.execute();
+            log.info("Post message from suggested to VK with id = {}", postResponse.getPostId());
+            return postResponse;
+        } catch (ApiException | ClientException e) {
+            log.error("Can`t post from suggested to wall for vkPost with id = {}", post.getId());
+        }
+        return null;
+    }
+
+    public OkResponse deleteMessageFromSuggested(Post post) {
+        Integer originalPostId = post.getOriginalPostId();
+        try {
+            OkResponse response = vk.wall().delete(actor)
+                    .ownerId(-groupId)
+                    .postId(originalPostId)
+                    .execute();
+            log.info("Message with id = {} is deleted from suggested", originalPostId);
+            return response;
+        } catch (ApiException | ClientException e) {
+            log.error("Can`t delete message with id = {} from suggested", originalPostId);
+        }
+        return null;
+    }
+
+    public String getMessageWithUserDataForTg(Post post) {
+        com.vk.api.sdk.objects.users.responses.GetResponse userGetResponse = getUserData(post);
+        return post.getMessage() + "\n" + "[" + userGetResponse.getFirstName() + " " +
+                userGetResponse.getLastName() + "](https://vk.com/" + userGetResponse.getDomain() + ")";
+    }
+
+    public String getMessageWithUserDataForVk(Post post) {
+        com.vk.api.sdk.objects.users.responses.GetResponse userGetResponse = getUserData(post);
+        return post.getMessage() + "\n" + "[https://vk.com/" + userGetResponse.getDomain() + "|" +
+                userGetResponse.getFirstName() + " " + userGetResponse.getLastName() + "]";
+    }
+
+    public com.vk.api.sdk.objects.users.responses.GetResponse getUserData(Post post) {
+        Long fromId = post.getFromId();
+        com.vk.api.sdk.objects.users.responses.GetResponse userGetResponse = null;
+        try {
+            userGetResponse = vk.users().get(actor)
+                    .userIds(fromId.toString())
+                    .fields(Fields.DOMAIN)
+                    .execute()
+                    .stream().findFirst()
+                    .get();
+        } catch (ApiException | ClientException e) {
+            log.error("Can`t get user info for id = {}", fromId);
+        }
+        return userGetResponse;
+    }
+}
