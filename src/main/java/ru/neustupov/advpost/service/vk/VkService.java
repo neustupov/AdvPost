@@ -210,11 +210,13 @@ public class VkService {
     }
 
     public PostResponse postMessageFromSuggested(Post post) {
+        String userDataAsUrlForVk = getMessageWithUserDataForVk(post);
         try {
             WallPostQuery query = vk.wall().post(actor)
                     .ownerId(-groupId)
                     .fromGroup(true)
                     .signed(true)
+                    .message(userDataAsUrlForVk)
                     .postId(post.getOriginalPostId());
             PostResponse postResponse = query.execute();
             log.info("Post message from suggested to VK with id = {}", postResponse.getPostId());
@@ -247,8 +249,12 @@ public class VkService {
     }
 
     public String getMessageWithUserDataForVk(Post post) {
+        return post.getMessage() + "\n" + getUserDataAsUrlForVk(post);
+    }
+
+    public String getUserDataAsUrlForVk(Post post) {
         com.vk.api.sdk.objects.users.responses.GetResponse userGetResponse = getUserData(post);
-        return post.getMessage() + "\n" + "[https://vk.com/" + userGetResponse.getDomain() + "|" +
+        return "[https://vk.com/" + userGetResponse.getDomain() + "|" +
                 userGetResponse.getFirstName() + " " + userGetResponse.getLastName() + "]";
     }
 

@@ -50,27 +50,18 @@ public class AdvService {
     @Scheduled(fixedDelayString = "${interval}")
     public void start() {
 
-        //Скачали посты из предложки
-        List<Post> postList = vkService.getPosts();
+        List<Post> posts = postService.processPosts(vkService.getPosts());
 
-        //Посмотрим в БД - если есть - пропускаем
-        List<Post> posts = postService.processPosts(postList);
-
-        //Пройдем по фото в постах - скачаем и зальем в S3
         posts.forEach(post -> {
             List<Attachment> photos = attachmentService.processAttachments(post);
             attachmentService.saveAll(photos);
             post.setAttachments(photos);
         });
 
-        //Сохраним посты с фотками
         List<Post> savedPostList = postService.saveAll(posts);
         log.info("Saved posts count = {}", savedPostList.size());
 
-        //Запульнем посты в ТГ
-        List<MessageResponse> messageResponseList = sendMessagesWithDelay(savedPostList);
-        //Сохраним ответы в БД, чтобы потом иметь возможность выпиливать сообщения в канале
-        messageResponseService.saveAll(messageResponseList);
+        messageResponseService.saveAll(sendMessagesWithDelay(savedPostList));
     }
 
     @Async
@@ -84,13 +75,16 @@ public class AdvService {
             case WITHOUT -> result = postWithoutWatermark(postId);
             case REJECT -> result = reject(postId);
         }
-        if(result) {
+        if (result) {
             //тут обработка после успешного поста\удаления, нужно удалить пост в ТГ и перерисовать клаву
             messageResponseService.findByPostId(postId)
-                    .ifPresent(responses -> {
-                        List<Integer> list = responses.stream().map(MessageResponse::getMessageId).toList();
-                        telegramBotService.deletePostAndKeyboard(notesChatId, list);
-                    });
+                    .ifPresent(responses ->
+                            telegramBotService.deletePostAndKeyboard(notesChatId,
+                                    responses.stream()
+                                            .map(MessageResponse::getMessageId)
+                                            .toList()));
+        } else {
+            log.error("Result of processed command is false");
         }
     }
 
@@ -108,7 +102,7 @@ public class AdvService {
 
     private Post checkPostIdAndGet(Long id) {
         Optional<Post> vkPost = postService.findById(id);
-        if(vkPost.isPresent()) {
+        if (vkPost.isPresent()) {
             return vkPost.get();
         } else {
             throw new VkException("Post with id {} is not present in database", id);
@@ -116,28 +110,25 @@ public class AdvService {
     }
 
     private boolean postWithWatermark(Post post) {
-        //Пошла жара по ВК
         List<Attachment> attachments = post.getAttachments();
         List<SaveWallPhotoResponse> photo = null;
-        if(attachments != null && !attachments.isEmpty()) {
-            //Получаем сервер для загрузки фото
-            GetWallUploadServerResponse photosServer = vkService.getPhotosServer();
-            //Загружаем фото с вотермарками на сервер
-            JSONObject uploadPhotos = vkService.addWatermarkAndUploadPhotoAttachment(post, photosServer);
+        if (attachments != null && !attachments.isEmpty()) {
+            JSONObject uploadPhotos = vkService.addWatermarkAndUploadPhotoAttachment(post, vkService.getPhotosServer());
             String photoString = uploadPhotos.get("photo").toString();
             String serverString = uploadPhotos.get("server").toString();
             String hash = uploadPhotos.get("hash").toString();
-            //Сохраняем фото в сервисном альбоме группы
+            log.debug("photo -> {}\n server -> {}\n hash -> {}", uploadPhotos.get("photo"), uploadPhotos.get("server"),
+                    uploadPhotos.get("hash"));
             photo = vkService.savePhoto(photoString, serverString, hash);
         }
-        //Отправляем пост на стену группы
         PostResponse postResponse = vkService.postMessageToWall(post, photo);
-        //Выпиливаем пост из предложки
-        OkResponse deleteMessageFromSuggestedResponse = vkService.deleteMessageFromSuggested(post);
-        sendMessageToTG(post);
-
-        //если что то пошло не так = false
-        return true;
+        if(postResponse != null && postResponse.getPostId() > 0) {
+            //Удаляем пост из предложки только если у нас все ок запостилось на стену
+            OkResponse deleteMessageFromSuggestedResponse = vkService.deleteMessageFromSuggested(post);
+            sendMessageToTG(post);
+            return true;
+        }
+        return false;
     }
 
     private Boolean postWithoutWatermark(Post post) {
@@ -154,7 +145,7 @@ public class AdvService {
 
     private List<MessageResponse> sendMessagesWithDelay(List<Post> posts) {
         List<MessageResponse> messageResponseList = new ArrayList<>();
-        for(int i = 0; i < posts.size(); i++) {
+        for (int i = 0; i < posts.size(); i++) {
             Post post = posts.get(i);
             int postNumber = i + 1;
             String message = "(" + postNumber + " из " + posts.size() + ") ID:" + post.getId() + " " + post.getMessage();
@@ -162,15 +153,13 @@ public class AdvService {
             messageResponseList.addAll(responses);
 
             boolean isLastPost = i == posts.size() - 1;
-
-            //Сформируем инлайн клавиатуру и ждём откликов по постам - дальнейшая обработка после реакции в ТГ
-            if(!responses.isEmpty()) {
+            if (!responses.isEmpty()) {
                 messageResponseList.addAll(responses);
                 List<MessageResponse> keyboardResponseList = telegramBotService.makeInlineKeyboardAndSendMessage(post, notesChatId);
                 messageResponseList.addAll(keyboardResponseList);
             }
-            //Пауза межу постами - 15сек для всех кроме последнего
-            if(!isLastPost) {
+            //Delay 15 sec
+            if (!isLastPost) {
                 try {
                     TimeUnit.SECONDS.sleep(15);
                 } catch (InterruptedException e) {
