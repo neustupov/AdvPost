@@ -12,14 +12,13 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import ru.neustupov.advpost.event.response.BotResponseEvent;
+import ru.neustupov.advpost.exception.VkException;
 import ru.neustupov.advpost.model.*;
-import ru.neustupov.advpost.service.s3.S3Service;
 import ru.neustupov.advpost.service.postgres.MessageResponseService;
 import ru.neustupov.advpost.service.postgres.AttachmentService;
 import ru.neustupov.advpost.service.postgres.PostService;
 import ru.neustupov.advpost.service.telegram.TelegramBotService;
-import ru.neustupov.advpost.service.vk.VkApiService;
-import ru.neustupov.advpost.service.watermark.WaterMarkService;
+import ru.neustupov.advpost.service.vk.VkService;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -33,23 +32,18 @@ public class AdvService {
     @Value("${chat.getFree}")
     private String getFreeChatId;
 
-    private final VkApiService vkApiService;
-    private final WaterMarkService waterMarkService;
+    private final VkService vkService;
     private final PostService postService;
     private final AttachmentService attachmentService;
     private final MessageResponseService messageResponseService;
     private final TelegramBotService telegramBotService;
-    private final S3Service s3Service;
 
-    public AdvService(VkApiService vkApiService, WaterMarkService waterMarkService, PostService postService,
-                      AttachmentService attachmentService, MessageResponseService messageResponseService,
-                      TelegramBotService telegramBotService, S3Service s3Service) {
-        this.vkApiService = vkApiService;
-        this.waterMarkService = waterMarkService;
+    public AdvService(VkService vkService, PostService postService, AttachmentService attachmentService,
+                      MessageResponseService messageResponseService, TelegramBotService telegramBotService) {
+        this.vkService = vkService;
         this.postService = postService;
         this.attachmentService = attachmentService;
         this.telegramBotService = telegramBotService;
-        this.s3Service = s3Service;
         this.messageResponseService = messageResponseService;
     }
 
@@ -57,7 +51,7 @@ public class AdvService {
     public void start() {
 
         //Скачали посты из предложки
-        List<Post> postList = vkApiService.getPosts();
+        List<Post> postList = vkService.getPosts();
 
         //Посмотрим в БД - если есть - пропускаем
         List<Post> posts = postService.processPosts(postList);
@@ -101,51 +95,45 @@ public class AdvService {
     }
 
     public boolean postWithWatermark(Long id) {
-        Optional<Post> vkPost = postService.findById(id);
-        if(vkPost.isPresent()) {
-            return postWithWatermark(vkPost.get());
-        } else {
-            log.error("Post with id {} is not present in database", id);
-            return false;
-        }
+        return postWithWatermark(checkPostIdAndGet(id));
     }
 
     public boolean postWithoutWatermark(Long id) {
-        Optional<Post> vkPost = postService.findById(id);
-        if(vkPost.isPresent()) {
-            return postWithoutWatermark(vkPost.get());
-        } else {
-            log.error("Post with id {} is not present in database", id);
-            return false;
-        }
+        return postWithoutWatermark(checkPostIdAndGet(id));
     }
 
     public boolean reject(Long id) {
+        return rejectMessage(checkPostIdAndGet(id)).getValue() == 1;
+    }
+
+    private Post checkPostIdAndGet(Long id) {
         Optional<Post> vkPost = postService.findById(id);
         if(vkPost.isPresent()) {
-            OkResponse response = rejectMessage(vkPost.get());
-            return response.getValue() == 1;
+            return vkPost.get();
         } else {
-            log.error("Post with id {} is not present in database", id);
-            return false;
+            throw new VkException("Post with id {} is not present in database", id);
         }
     }
 
     private boolean postWithWatermark(Post post) {
         //Пошла жара по ВК
-        //Получаем сервер для загрузки фото
-        GetWallUploadServerResponse photosServer = vkApiService.getPhotosServer();
-        //Загружаем фото с вотермарками на сервер
-        JSONObject uploadPhotos = vkApiService.addWatermarkAndUploadPhotoAttachment(post, photosServer);
-        String photoString = uploadPhotos.get("photo").toString();
-        String serverString = uploadPhotos.get("server").toString();
-        String hash = uploadPhotos.get("hash").toString();
-        //Сохраняем фото в сервисном альбоме группы
-        List<SaveWallPhotoResponse> photo = vkApiService.savePhoto(photoString, serverString, hash);
+        List<Attachment> attachments = post.getAttachments();
+        List<SaveWallPhotoResponse> photo = null;
+        if(attachments != null && !attachments.isEmpty()) {
+            //Получаем сервер для загрузки фото
+            GetWallUploadServerResponse photosServer = vkService.getPhotosServer();
+            //Загружаем фото с вотермарками на сервер
+            JSONObject uploadPhotos = vkService.addWatermarkAndUploadPhotoAttachment(post, photosServer);
+            String photoString = uploadPhotos.get("photo").toString();
+            String serverString = uploadPhotos.get("server").toString();
+            String hash = uploadPhotos.get("hash").toString();
+            //Сохраняем фото в сервисном альбоме группы
+            photo = vkService.savePhoto(photoString, serverString, hash);
+        }
         //Отправляем пост на стену группы
-        PostResponse postResponse = vkApiService.postMessageToWall(post, photo);
+        PostResponse postResponse = vkService.postMessageToWall(post, photo);
         //Выпиливаем пост из предложки
-        OkResponse deleteMessageFromSuggestedResponse = vkApiService.deleteMessageFromSuggested(post);
+        OkResponse deleteMessageFromSuggestedResponse = vkService.deleteMessageFromSuggested(post);
         sendMessageToTG(post);
 
         //если что то пошло не так = false
@@ -153,7 +141,7 @@ public class AdvService {
     }
 
     private Boolean postWithoutWatermark(Post post) {
-        PostResponse response = vkApiService.postMessageFromSuggested(post);
+        PostResponse response = vkService.postMessageFromSuggested(post);
         sendMessageToTG(post);
 
         //если что то пошло не так = false
@@ -161,7 +149,7 @@ public class AdvService {
     }
 
     private OkResponse rejectMessage(Post post) {
-        return vkApiService.deleteMessageFromSuggested(post);
+        return vkService.deleteMessageFromSuggested(post);
     }
 
     private List<MessageResponse> sendMessagesWithDelay(List<Post> posts) {
@@ -194,6 +182,6 @@ public class AdvService {
     }
 
     private void sendMessageToTG(Post post) {
-        telegramBotService.sendMessage(post, vkApiService.getMessageWithUserDataForTg(post), getFreeChatId, PostStatus.PROCESSED);
+        telegramBotService.sendMessage(post, vkService.getMessageWithUserDataForTg(post), getFreeChatId, PostStatus.PROCESSED);
     }
 }

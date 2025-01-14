@@ -29,6 +29,7 @@ import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.apache.http.impl.client.*;
+import ru.neustupov.advpost.exception.VkException;
 import ru.neustupov.advpost.model.AttachmentType;
 import ru.neustupov.advpost.model.PostStatus;
 import ru.neustupov.advpost.model.Attachment;
@@ -45,7 +46,7 @@ import static com.vk.api.sdk.objects.wall.GetFilter.SUGGESTS;
 
 @Slf4j
 @Service
-public class VkApiService {
+public class VkService {
 
     @Value("${vk.accessToken}")
     private String accessToken;
@@ -59,7 +60,7 @@ public class VkApiService {
     private VkApiClient vk;
     private final WaterMarkService waterMarkService;
 
-    public VkApiService(WaterMarkService waterMarkService) {
+    public VkService(WaterMarkService waterMarkService) {
         this.waterMarkService = waterMarkService;
     }
 
@@ -125,7 +126,6 @@ public class VkApiService {
     }
 
     public GetWallUploadServerResponse getPhotosServer() {
-
         try {
             return vk.photos().getWallUploadServer(actor)
                     .groupId(groupId)
@@ -138,7 +138,6 @@ public class VkApiService {
     public JSONObject addWatermarkAndUploadPhotoAttachment(Post post, GetWallUploadServerResponse photosServer) {
 
         JSONObject jsonResult = null;
-
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             HttpPost uploadFile = new HttpPost(photosServer.getUploadUrl());
             MultipartEntityBuilder builder = MultipartEntityBuilder.create();
@@ -175,7 +174,6 @@ public class VkApiService {
     }
 
     public List<SaveWallPhotoResponse> savePhoto(String photoString, String serverString, String hash) {
-
         List<SaveWallPhotoResponse> photoResponses = null;
         try {
             photoResponses = vk.photos().saveWallPhoto(actor)
@@ -192,9 +190,7 @@ public class VkApiService {
     }
 
     public PostResponse postMessageToWall(Post post, List<SaveWallPhotoResponse> attachments) {
-
         String totalMessage = getMessageWithUserDataForVk(post);
-
         try {
             WallPostQuery query = vk.wall().post(actor)
                     .ownerId(-groupId)
@@ -258,17 +254,18 @@ public class VkApiService {
 
     public com.vk.api.sdk.objects.users.responses.GetResponse getUserData(Post post) {
         Long fromId = post.getFromId();
-        com.vk.api.sdk.objects.users.responses.GetResponse userGetResponse = null;
+        List<com.vk.api.sdk.objects.users.responses.GetResponse> userGetResponse;
         try {
-            userGetResponse = vk.users().get(actor)
+            userGetResponse = new ArrayList<>(vk.users().get(actor)
                     .userIds(fromId.toString())
                     .fields(Fields.DOMAIN)
-                    .execute()
-                    .stream().findFirst()
-                    .get();
+                    .execute());
         } catch (ApiException | ClientException e) {
-            log.error("Can`t get user info for id = {}", fromId);
+            throw new VkException("Can`t get user info for id = {}", e, fromId);
         }
-        return userGetResponse;
+        if (!userGetResponse.isEmpty()) {
+            return userGetResponse.stream().findFirst().orElse(null);
+        }
+        throw new VkException("User with id = {} is not present in VK service", fromId);
     }
 }

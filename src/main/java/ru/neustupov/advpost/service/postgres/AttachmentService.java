@@ -1,7 +1,6 @@
 package ru.neustupov.advpost.service.postgres;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ru.neustupov.advpost.model.Attachment;
 import ru.neustupov.advpost.model.AttachmentType;
@@ -21,7 +20,6 @@ public class AttachmentService {
 
     public static final String PHOTO_TYPE = "image/jpeg";
     public static final String VIDEO_TYPE = "video/x-msvideo";
-
     private final AttachmentRepository attachmentRepository;
     private final DownloadService downloadService;
     private final S3Util s3Util;

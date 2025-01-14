@@ -25,17 +25,14 @@ public class PostService {
 
     public List<Post> processPosts(List<Post> postList) {
         List<Post> totalList = new ArrayList<>();
-        postList.forEach(p -> {
-            String hash = p.getHash();
-            findByHashAndStatusNotIn(hash)
-                    .ifPresentOrElse(postFromDb -> log.info("Post with hash {} is present in DB",
-                            postFromDb.getHash()), () -> totalList.add(p));
-        });
+        postList.forEach(p -> findByHashAndStatusNotIn(p.getHash())
+                .ifPresentOrElse(postFromDb -> log.info("Post with hash {} is present in DB",
+                        postFromDb.getHash()), () -> totalList.add(p)));
         return totalList;
     }
 
     public Optional<Post> findByHashAndStatusNotIn(String hash) {
-        return postRepository.findByHashAndStatus(hash).get().stream().findFirst();
+        return postRepository.findByHashAndStatus(hash).flatMap(posts -> posts.stream().findFirst());
     }
 
     public Optional<Post> findById(Long id) {

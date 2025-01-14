@@ -2,13 +2,10 @@ package ru.neustupov.advpost.service.s3;
 
 import io.minio.*;
 import io.minio.errors.*;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.InvalidKeyException;
@@ -43,21 +40,6 @@ public class S3Service {
         } catch (Exception e) {
             throw new RuntimeException("Error occurred: " + e.getMessage());
         }
-    }
-
-    public File getFile(String filename) {
-        File file = new File(filename);
-        try (InputStream stream =
-                     minioClient.getObject(GetObjectArgs
-                             .builder()
-                             .bucket(s3bucket)
-                             .object(filename)
-                             .build())) {
-            FileUtils.copyInputStreamToFile(stream, file);
-        } catch (Exception e) {
-            log.error(e.getMessage());
-        }
-        return file;
     }
 
     public InputStream getFileAsInputStream(String filename) {

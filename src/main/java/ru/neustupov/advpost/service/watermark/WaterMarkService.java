@@ -3,7 +3,6 @@ package ru.neustupov.advpost.service.watermark;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.neustupov.advpost.model.Attachment;
-import ru.neustupov.advpost.model.Post;
 import ru.neustupov.advpost.service.s3.S3Util;
 
 import javax.imageio.ImageIO;
@@ -12,8 +11,6 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
 
 import static ru.neustupov.advpost.service.postgres.AttachmentService.PHOTO_TYPE;
 

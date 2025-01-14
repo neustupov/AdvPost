@@ -23,7 +23,6 @@ public class Attachment extends AbstractEntity {
     @Column(columnDefinition = "text")
     private String originalUri;
     private String s3Uri;
-    private String hash;
     private AttachmentType type;
 
     public String getName() {
@@ -56,14 +55,6 @@ public class Attachment extends AbstractEntity {
 
     public void setS3Uri(String s3Uri) {
         this.s3Uri = s3Uri;
-    }
-
-    public String getHash() {
-        return hash;
-    }
-
-    public void setHash(InputStream inputStream) {
-        this.hash = getHashAsDigest(inputStream);
     }
 
     public String getHashAsDigest(InputStream inputStream) {
