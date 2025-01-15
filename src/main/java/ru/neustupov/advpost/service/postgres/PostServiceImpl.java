@@ -1,10 +1,7 @@
 package ru.neustupov.advpost.service.postgres;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import ru.neustupov.advpost.event.status.ChangePostStatusEvent;
 import ru.neustupov.advpost.model.PostStatus;
 import ru.neustupov.advpost.model.Post;
 import ru.neustupov.advpost.repository.PostRepository;
@@ -49,14 +46,6 @@ public class PostServiceImpl implements PostService {
             log.info("Change status to {} for post with id = {}", nextStatus, p.getId());
         });
         this.saveAll(postList);
-    }
-
-    @Async
-    @EventListener
-    public void handleChangePostStatusEvent(ChangePostStatusEvent event) {
-        Post post = event.getPost();
-        PostStatus nextStatus = event.getNextStatus();
-        this.changeStatus(List.of(post), nextStatus);
     }
 
     private Optional<Post> findByHashAndStatusNotIn(String hash) {

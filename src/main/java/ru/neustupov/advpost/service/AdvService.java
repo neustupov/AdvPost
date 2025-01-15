@@ -6,11 +6,8 @@ import com.vk.api.sdk.objects.wall.responses.PostResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import ru.neustupov.advpost.event.response.BotResponseEvent;
 import ru.neustupov.advpost.exception.VkException;
 import ru.neustupov.advpost.model.*;
 import ru.neustupov.advpost.service.postgres.AttachmentService;
@@ -63,11 +60,7 @@ public class AdvService {
         messageResponseService.saveAll(sendMessagesWithDelay(savedPostList));
     }
 
-    @Async
-    @EventListener
-    public void handleBotResponseEvent(BotResponseEvent event) {
-        Long postId = event.getId();
-        Command command = event.getCommand();
+    public void processBotResponse(Long postId, Command command) {
         boolean result = false;
         switch (command) {
             case WITH -> result = postWithWatermark(postId);
