@@ -23,8 +23,8 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class AdvService {
 
-    @Value("${chat.notes}")
-    private String notesChatId;
+    @Value("${chat.moderate}")
+    private String moderateChatId;
     @Value("${chat.getFree}")
     private String getFreeChatId;
 
@@ -71,7 +71,7 @@ public class AdvService {
             //тут обработка после успешного поста\удаления, нужно удалить пост в ТГ и перерисовать клаву
             messageResponseService.findByPostId(postId)
                     .ifPresent(responses ->
-                            telegramService.deletePostAndKeyboard(notesChatId,
+                            telegramService.deletePostAndKeyboard(moderateChatId,
                                     responses.stream()
                                             .map(MessageResponse::getMessageId)
                                             .toList()));
@@ -141,13 +141,13 @@ public class AdvService {
             Post post = posts.get(i);
             int postNumber = i + 1;
             String message = "(" + postNumber + " из " + posts.size() + ") ID:" + post.getId() + " " + post.getMessage();
-            List<MessageResponse> responses = telegramService.sendMessage(post, message, notesChatId, PostStatus.PUBLISHED);
+            List<MessageResponse> responses = telegramService.sendMessage(post, message, moderateChatId, PostStatus.PUBLISHED);
             messageResponseList.addAll(responses);
 
             boolean isLastPost = i == posts.size() - 1;
             if (!responses.isEmpty()) {
                 messageResponseList.addAll(responses);
-                List<MessageResponse> keyboardResponseList = telegramService.makeInlineKeyboardAndSendMessage(post, notesChatId);
+                List<MessageResponse> keyboardResponseList = telegramService.makeInlineKeyboardAndSendMessage(post, moderateChatId);
                 messageResponseList.addAll(keyboardResponseList);
             }
             //Delay 15 sec

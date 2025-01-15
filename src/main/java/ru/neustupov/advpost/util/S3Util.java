@@ -1,6 +1,7 @@
-package ru.neustupov.advpost.service.s3;
+package ru.neustupov.advpost.util;
 
 import org.springframework.stereotype.Component;
+import ru.neustupov.advpost.service.s3.S3Service;
 
 import java.io.InputStream;
 

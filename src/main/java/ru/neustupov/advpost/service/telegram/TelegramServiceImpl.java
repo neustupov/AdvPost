@@ -19,7 +19,7 @@ import ru.neustupov.advpost.model.MessageResponse;
 import ru.neustupov.advpost.model.PostStatus;
 import ru.neustupov.advpost.model.Attachment;
 import ru.neustupov.advpost.model.Post;
-import ru.neustupov.advpost.service.s3.S3Util;
+import ru.neustupov.advpost.util.S3Util;
 import ru.neustupov.advpost.telegram.bot.TelegramBot;
 
 import java.io.*;
@@ -56,6 +56,11 @@ public class TelegramServiceImpl implements TelegramService {
             return sendText(chatId, post, message, null, finalStatus);
         }
         return List.of();
+    }
+
+    @Override
+    public MessageResponse sendMessage(String message, String chatId) {
+        return sendTextWithoutKeyboard(message, chatId);
     }
 
     @Override
@@ -164,6 +169,20 @@ public class TelegramServiceImpl implements TelegramService {
                 log.error("Can't send photos with media group", e);
             }
         return List.of();
+    }
+
+    private MessageResponse sendTextWithoutKeyboard(String message, String chatId) {
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setChatId(chatId);
+        sendMessage.setText(message);
+        try {
+            Message execute = telegramBot.execute(sendMessage);
+            log.info("Send message with text = {}", message);
+            return new MessageResponse(Long.parseLong(chatId), execute.getMessageId());
+        } catch (TelegramApiException e) {
+            log.error("Can't send photos with media group", e);
+        }
+        return null;
     }
 
     private InlineKeyboardMarkup makeInlineKeyboard(Post post) {

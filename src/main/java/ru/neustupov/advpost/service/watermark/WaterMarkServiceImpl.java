@@ -3,7 +3,7 @@ package ru.neustupov.advpost.service.watermark;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.neustupov.advpost.model.Attachment;
-import ru.neustupov.advpost.service.s3.S3Util;
+import ru.neustupov.advpost.util.S3Util;
 
 import javax.imageio.ImageIO;
 import java.awt.*;

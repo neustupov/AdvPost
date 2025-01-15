@@ -7,7 +7,7 @@ import ru.neustupov.advpost.model.AttachmentType;
 import ru.neustupov.advpost.model.Post;
 import ru.neustupov.advpost.repository.AttachmentRepository;
 import ru.neustupov.advpost.service.file.DownloadService;
-import ru.neustupov.advpost.service.s3.S3Util;
+import ru.neustupov.advpost.util.S3Util;
 
 import java.io.IOException;
 import java.io.InputStream;

@@ -10,6 +10,8 @@ public interface TelegramService {
 
     List<MessageResponse> sendMessage(Post post, String message, String chatId, PostStatus finalStatus);
 
+    MessageResponse sendMessage(String message, String chatId);
+
     List<MessageResponse> makeInlineKeyboardAndSendMessage(Post post, String chatId);
 
     void deletePostAndKeyboard(String chatId, List<Integer> messageIds);
