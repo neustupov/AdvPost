@@ -1,16 +1,14 @@
-package ru.neustupov.advpost.event.status;
+package ru.neustupov.advpost.event.document;
 
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
 import org.springframework.stereotype.Component;
-import ru.neustupov.advpost.model.PostStatus;
-import ru.neustupov.advpost.model.Post;
 
 @Slf4j
 @Component
-public class ChangePostStatusEventPublisher implements ApplicationEventPublisherAware {
+public class DocumentUploadEventPublisher implements ApplicationEventPublisherAware  {
 
     private ApplicationEventPublisher applicationEventPublisher;
 
@@ -19,8 +17,8 @@ public class ChangePostStatusEventPublisher implements ApplicationEventPublisher
         this.applicationEventPublisher = applicationEventPublisher;
     }
 
-    public void publishEvent(final Post post, final PostStatus nextStatus) {
-        log.info("Publishing ChangePostStatusEvent");
-        applicationEventPublisher.publishEvent(new ChangePostStatusEvent(this, post, nextStatus));
+    public void publishEvent(final String documentId) {
+        log.info("Publishing DocumentUploadEvent");
+        applicationEventPublisher.publishEvent(new DocumentUploadEvent(this, documentId));
     }
 }

@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
+import ru.neustupov.advpost.event.document.DocumentUploadEventPublisher;
 import ru.neustupov.advpost.event.response.BotResponseEventPublisher;
 import ru.neustupov.advpost.telegram.bot.TelegramBot;
 
@@ -16,9 +17,9 @@ public class TelegramBotConfiguration {
     @SneakyThrows
     @Bean
     public TelegramBot telegramBot(@Value("${bot.key}") String botToken, TelegramBotsApi telegramBotsApi,
-                                   BotResponseEventPublisher botResponseEventPublisher) {
+                                   BotResponseEventPublisher botResponseEventPublisher, DocumentUploadEventPublisher documentUploadEventPublisher) {
         var botOptions = new DefaultBotOptions();
-        var bot =  new TelegramBot(botOptions, botToken, botResponseEventPublisher);
+        var bot =  new TelegramBot(botOptions, botToken, botResponseEventPublisher, documentUploadEventPublisher);
         telegramBotsApi.registerBot(bot);
         return bot;
     }

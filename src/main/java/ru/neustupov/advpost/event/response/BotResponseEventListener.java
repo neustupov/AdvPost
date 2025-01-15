@@ -4,15 +4,15 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import ru.neustupov.advpost.model.Command;
-import ru.neustupov.advpost.service.AdvService;
+import ru.neustupov.advpost.service.PostProcessService;
 
 @Component
 public class BotResponseEventListener {
 
-    private final AdvService advService;
+    private final PostProcessService postProcessService;
 
-    public BotResponseEventListener(AdvService advService) {
-        this.advService = advService;
+    public BotResponseEventListener(PostProcessService postProcessService) {
+        this.postProcessService = postProcessService;
     }
 
     @Async
@@ -20,6 +20,6 @@ public class BotResponseEventListener {
     public void handleBotResponseEvent(BotResponseEvent event) {
         Long postId = event.getId();
         Command command = event.getCommand();
-        advService.processBotResponse(postId, command);
+        postProcessService.processBotResponse(postId, command);
     }
 }

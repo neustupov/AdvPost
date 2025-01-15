@@ -1,12 +1,16 @@
 package ru.neustupov.advpost.service.telegram;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.json.JSONObject;
 import org.springframework.stereotype.Service;
+import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.ParseMode;
 import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.objects.File;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
@@ -20,6 +24,7 @@ import ru.neustupov.advpost.model.MessageResponse;
 import ru.neustupov.advpost.model.PostStatus;
 import ru.neustupov.advpost.model.Attachment;
 import ru.neustupov.advpost.model.Post;
+import ru.neustupov.advpost.model.dto.AdvertisingPostDTO;
 import ru.neustupov.advpost.util.S3Util;
 import ru.neustupov.advpost.telegram.bot.TelegramBot;
 
@@ -88,6 +93,27 @@ public class TelegramServiceImpl implements TelegramService {
         });
     }
 
+    @Override
+    public JSONObject getDocumentAsJson(String documentId) {
+        GetFile getFile = GetFile.builder()
+                .fileId(documentId)
+                .build();
+        try {
+            File file = telegramBot.execute(getFile);
+            String filePath = file.getFilePath();
+            try (InputStream inputStream = telegramBot.downloadFileAsStream(filePath)) {
+                ObjectMapper objectMapper = new ObjectMapper();
+                List<AdvertisingPostDTO> dto = objectMapper.reader().readValue(inputStream, List.class);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            log.info("Get file with id = {}", documentId);
+            return new JSONObject();
+        } catch (TelegramApiException e) {
+            throw new TelegramServiceException(e.getMessage(), e);
+        }
+    }
+
     private List<MessageResponse> sendUserPhoto(String chatId, Post post, String message, Attachment attachment, PostStatus finalStatus) {
         String s3Uri = attachment.getS3Uri();
         try (InputStream inputStream = s3Util.download(s3Uri)) {
@@ -134,7 +160,7 @@ public class TelegramServiceImpl implements TelegramService {
                 }).collect(Collectors.toList());
 
         InputMedia media = medias.get(0);
-        media.setCaption(message.replaceAll("\\*", ""));
+        media.setCaption(message.replaceAll("\\*", "-"));
 
         SendMediaGroup sendMediaGroup = SendMediaGroup.builder()
                 .chatId(chatId)

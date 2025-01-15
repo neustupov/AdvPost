@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
-public class AdvService {
+public class PostProcessService {
 
     @Value("${chat.moderate}")
     private String moderateChatId;
@@ -35,8 +35,8 @@ public class AdvService {
     private final MessageResponseService messageResponseService;
     private final TelegramService telegramService;
 
-    public AdvService(VkService vkService, PostService postService, AttachmentService attachmentService,
-                      MessageResponseService messageResponseService, TelegramService telegramService) {
+    public PostProcessService(VkService vkService, PostService postService, AttachmentService attachmentService,
+                              MessageResponseService messageResponseService, TelegramService telegramService) {
         this.vkService = vkService;
         this.postService = postService;
         this.attachmentService = attachmentService;
@@ -91,6 +91,11 @@ public class AdvService {
 
     public boolean reject(Long id) {
         return rejectMessage(checkPostIdAndGet(id)).getValue() == 1;
+    }
+
+    public boolean processDocument(String documentId) {
+        JSONObject document = telegramService.getDocumentAsJson(documentId);
+        return true;
     }
 
     private Post checkPostIdAndGet(Long id) {

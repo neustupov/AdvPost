@@ -19,7 +19,8 @@ public class CommonExceptionHandler {
     }
 
     @ExceptionHandler({VkException.class, DownloadServiceException.class, AttachmentServiceException.class,
-            S3ServiceException.class, TelegramServiceException.class, AdvServiceException.class, WaterMarkServiceException.class})
+            S3ServiceException.class, TelegramServiceException.class, AdvServiceException.class,
+            WaterMarkServiceException.class, AdvertisingServiceException.class})
     public Exception handleVkException(Exception exception) {
         telegramService.sendMessage(exception.getMessage(), exceptionChatId);
         return exception;

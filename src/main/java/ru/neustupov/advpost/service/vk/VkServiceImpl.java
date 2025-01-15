@@ -117,7 +117,7 @@ public class VkServiceImpl implements VkService {
                     .originalPostId(p.getId())
                     .ownerId(p.getOwnerId())
                     .fromId(p.getFromId())
-                    .message(p.getText().replaceAll("\\*", ""))
+                    .message(p.getText().replaceAll("\\*", "-"))
                     .attachments(attachmentList)
                     .status(PostStatus.NEW)
                     .hash(p.getHash())
