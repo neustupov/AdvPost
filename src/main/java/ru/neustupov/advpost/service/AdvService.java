@@ -8,6 +8,7 @@ import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import ru.neustupov.advpost.exception.AdvServiceException;
 import ru.neustupov.advpost.exception.VkException;
 import ru.neustupov.advpost.model.*;
 import ru.neustupov.advpost.service.postgres.AttachmentService;
@@ -155,7 +156,7 @@ public class AdvService {
                 try {
                     TimeUnit.SECONDS.sleep(15);
                 } catch (InterruptedException e) {
-                    log.error("You not sleep NEO");
+                    throw new AdvServiceException(e.getMessage(), e);
                 }
             }
         }

@@ -2,6 +2,7 @@ package ru.neustupov.advpost.service.file;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.neustupov.advpost.exception.DownloadServiceException;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -20,7 +21,7 @@ public class DownloadServiceImpl implements DownloadService {
             log.info("Download file with size = {}", allBytes.length);
             return new ByteArrayInputStream(allBytes);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new DownloadServiceException(e.getMessage(), e);
         }
     }
 }

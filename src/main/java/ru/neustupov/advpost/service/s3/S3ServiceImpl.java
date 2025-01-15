@@ -5,6 +5,7 @@ import io.minio.errors.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import ru.neustupov.advpost.exception.S3ServiceException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,7 +40,7 @@ public class S3ServiceImpl implements S3Service {
             log.info("Attachment with name = {} is uploaded to S3", objectName);
             return uploadedAttachment;
         } catch (Exception e) {
-            throw new RuntimeException("Error occurred: " + e.getMessage());
+            throw new S3ServiceException("Error occurred: " + e.getMessage(), e);
         }
     }
 
@@ -54,8 +55,7 @@ public class S3ServiceImpl implements S3Service {
         } catch (ErrorResponseException | XmlParserException | ServerException | NoSuchAlgorithmException |
                  IOException | InvalidResponseException | InvalidKeyException | InternalException |
                  InsufficientDataException e) {
-            log.error(e.getMessage());
+            throw new S3ServiceException(e.getMessage(), e);
         }
-        return null;
     }
 }

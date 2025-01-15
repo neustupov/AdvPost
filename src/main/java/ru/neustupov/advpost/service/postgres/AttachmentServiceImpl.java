@@ -2,6 +2,7 @@ package ru.neustupov.advpost.service.postgres;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.neustupov.advpost.exception.AttachmentServiceException;
 import ru.neustupov.advpost.model.Attachment;
 import ru.neustupov.advpost.model.AttachmentType;
 import ru.neustupov.advpost.model.Post;
@@ -48,7 +49,7 @@ public class AttachmentServiceImpl implements AttachmentService {
                     attachment.setName(fileName);
                     attachment.setS3Uri(upload);
                 } catch (IOException e) {
-                    throw new RuntimeException(e);
+                    throw new AttachmentServiceException(e.getMessage(), e);
                 }
             });
         }

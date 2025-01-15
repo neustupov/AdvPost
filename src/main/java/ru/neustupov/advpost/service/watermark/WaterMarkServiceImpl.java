@@ -2,6 +2,7 @@ package ru.neustupov.advpost.service.watermark;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.neustupov.advpost.exception.WaterMarkServiceException;
 import ru.neustupov.advpost.model.Attachment;
 import ru.neustupov.advpost.util.S3Util;
 
@@ -33,9 +34,8 @@ public class WaterMarkServiceImpl implements WaterMarkService {
             uploadToS3(photo, imageWatermark);
             return imageWatermark;
         } catch (IOException e) {
-            log.error("Can`t download file with uri = {} from S3", s3Uri);
+            throw new WaterMarkServiceException("Can`t download file with uri = " + s3Uri + " from S3. Exception -> " + e.getMessage(), e);
         }
-        return null;
     }
 
     private byte[] addImageWatermark(InputStream sourceImageFile) {
@@ -56,7 +56,7 @@ public class WaterMarkServiceImpl implements WaterMarkService {
             try {
                 watermarkImageFile = new File(resource.toURI());
             } catch (URISyntaxException e) {
-                throw new RuntimeException(e);
+                throw new WaterMarkServiceException(e.getMessage(), e);
             }
 
             BufferedImage watermarkImage = ImageIO.read(watermarkImageFile);
@@ -81,9 +81,8 @@ public class WaterMarkServiceImpl implements WaterMarkService {
             log.info("Image with watermark size = {}", bytes.length);
             return bytes;
         } catch (IOException ex) {
-            log.error(ex.getMessage());
+            throw new WaterMarkServiceException(ex.getMessage(), ex);
         }
-        return null;
     }
 
     private void uploadToS3(Attachment photo, byte[] imageWatermark) {

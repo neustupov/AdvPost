@@ -15,6 +15,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.neustupov.advpost.event.status.ChangePostStatusEventPublisher;
+import ru.neustupov.advpost.exception.TelegramServiceException;
 import ru.neustupov.advpost.model.MessageResponse;
 import ru.neustupov.advpost.model.PostStatus;
 import ru.neustupov.advpost.model.Attachment;
@@ -82,7 +83,7 @@ public class TelegramServiceImpl implements TelegramService {
                 telegramBot.execute(deleteMessages);
                 log.info("Delete message with id = {} from chat with id = {}", m, chatId);
             } catch (TelegramApiException e) {
-                log.error("Can`t delete messages with id = {}", m);
+                throw new TelegramServiceException("Can`t delete messages with id = " + m + ". Error- > " + e.getMessage(), e);
             }
         });
     }
@@ -105,11 +106,10 @@ public class TelegramServiceImpl implements TelegramService {
             MessageResponse messageResponse = new MessageResponse(post, execute);
             return List.of(messageResponse);
         } catch (IOException e) {
-            log.error("Can`t download attachment with uri = {} from S3", s3Uri);
+            throw new TelegramServiceException("Can`t download attachment with uri = " + s3Uri + " from S3. Error- > " + e.getMessage(), e);
         } catch (TelegramApiException e) {
-            log.error("Can't send attachment message", e);
+            throw new TelegramServiceException("Can't send attachment message. Error- > " + e.getMessage(), e);
         }
-        return List.of();
     }
 
     private List<MessageResponse> sendMediaGroup(String chatId, Post post, String message, List<Attachment> attachments, PostStatus finalStatus) {
@@ -129,9 +129,8 @@ public class TelegramServiceImpl implements TelegramService {
                                     .build();
                         }
                     } catch (IOException e) {
-                        log.error("Can`t download attachment with uri = {} from S3", s3Uri);
+                        throw new TelegramServiceException("Can`t download attachment with uri = " + s3Uri + " from S3. Error- > " + e.getMessage(), e);
                     }
-                    return null;
                 }).collect(Collectors.toList());
 
         InputMedia media = medias.get(0);
@@ -147,9 +146,8 @@ public class TelegramServiceImpl implements TelegramService {
             log.info("Send message with text => {}. Count of attachments => {}", message, attachments.size());
             return execute.stream().map(e -> new MessageResponse(post, e)).toList();
         } catch (TelegramApiException e) {
-            log.error("Can't send attachments with media group", e);
+            throw new TelegramServiceException("Can't send attachments with media group. Error- > " + e.getMessage(), e);
         }
-        return List.of();
     }
 
     private List<MessageResponse> sendText(String chatId, Post post, String message, InlineKeyboardMarkup inlineKeyboard, PostStatus finalStatus) {
@@ -166,9 +164,8 @@ public class TelegramServiceImpl implements TelegramService {
                 log.info("Send message with text = {}", message);
                 return List.of(new MessageResponse(post, execute));
             } catch (TelegramApiException e) {
-                log.error("Can't send photos with media group", e);
+                throw new TelegramServiceException("Can't send photos with media group. Error- > " + e.getMessage(), e);
             }
-        return List.of();
     }
 
     private MessageResponse sendTextWithoutKeyboard(String message, String chatId) {
@@ -180,9 +177,8 @@ public class TelegramServiceImpl implements TelegramService {
             log.info("Send message with text = {}", message);
             return new MessageResponse(Long.parseLong(chatId), execute.getMessageId());
         } catch (TelegramApiException e) {
-            log.error("Can't send photos with media group", e);
+            throw new TelegramServiceException("Can't send photos with media group. Error- > " + e.getMessage(), e);
         }
-        return null;
     }
 
     private InlineKeyboardMarkup makeInlineKeyboard(Post post) {

@@ -11,6 +11,7 @@ import com.vk.api.sdk.objects.photos.Photo;
 import com.vk.api.sdk.objects.photos.PhotoSizes;
 import com.vk.api.sdk.objects.photos.responses.GetWallUploadServerResponse;
 import com.vk.api.sdk.objects.photos.responses.SaveWallPhotoResponse;
+import com.vk.api.sdk.objects.video.VideoFiles;
 import com.vk.api.sdk.objects.video.VideoFull;
 import com.vk.api.sdk.objects.wall.responses.GetResponse;
 import com.vk.api.sdk.objects.wall.responses.PostResponse;
@@ -82,7 +83,7 @@ public class VkServiceImpl implements VkService {
                     .extended(true)
                     .execute();
         } catch (ApiException | ClientException e) {
-            throw new RuntimeException(e);
+            throw new VkException(e.getMessage(), e);
         }
 
         List<Post> postList = new ArrayList<>();
@@ -108,6 +109,9 @@ public class VkServiceImpl implements VkService {
 
                 VideoFull video = a.getVideo();
                 //TODO добавить обработку видео
+                if(video != null) {
+                    VideoFiles files = video.getFiles();
+                }
             });
             Post post = Post.builder()
                     .originalPostId(p.getId())
@@ -134,7 +138,7 @@ public class VkServiceImpl implements VkService {
                     .groupId(groupId)
                     .execute();
         } catch (ApiException | ClientException e) {
-            throw new RuntimeException(e);
+            throw new VkException(e.getMessage(), e);
         }
     }
 
