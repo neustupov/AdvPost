@@ -1,7 +1,6 @@
 package ru.neustupov.advpost.service;
 
 import com.vk.api.sdk.objects.base.responses.OkResponse;
-import com.vk.api.sdk.objects.photos.responses.GetWallUploadServerResponse;
 import com.vk.api.sdk.objects.photos.responses.SaveWallPhotoResponse;
 import com.vk.api.sdk.objects.wall.responses.PostResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -14,10 +13,10 @@ import org.springframework.stereotype.Service;
 import ru.neustupov.advpost.event.response.BotResponseEvent;
 import ru.neustupov.advpost.exception.VkException;
 import ru.neustupov.advpost.model.*;
-import ru.neustupov.advpost.service.postgres.MessageResponseService;
 import ru.neustupov.advpost.service.postgres.AttachmentService;
+import ru.neustupov.advpost.service.postgres.MessageResponseService;
 import ru.neustupov.advpost.service.postgres.PostService;
-import ru.neustupov.advpost.service.telegram.TelegramBotService;
+import ru.neustupov.advpost.service.telegram.TelegramService;
 import ru.neustupov.advpost.service.vk.VkService;
 
 import java.util.*;
@@ -36,14 +35,14 @@ public class AdvService {
     private final PostService postService;
     private final AttachmentService attachmentService;
     private final MessageResponseService messageResponseService;
-    private final TelegramBotService telegramBotService;
+    private final TelegramService telegramService;
 
     public AdvService(VkService vkService, PostService postService, AttachmentService attachmentService,
-                      MessageResponseService messageResponseService, TelegramBotService telegramBotService) {
+                      MessageResponseService messageResponseService, TelegramService telegramService) {
         this.vkService = vkService;
         this.postService = postService;
         this.attachmentService = attachmentService;
-        this.telegramBotService = telegramBotService;
+        this.telegramService = telegramService;
         this.messageResponseService = messageResponseService;
     }
 
@@ -79,7 +78,7 @@ public class AdvService {
             //тут обработка после успешного поста\удаления, нужно удалить пост в ТГ и перерисовать клаву
             messageResponseService.findByPostId(postId)
                     .ifPresent(responses ->
-                            telegramBotService.deletePostAndKeyboard(notesChatId,
+                            telegramService.deletePostAndKeyboard(notesChatId,
                                     responses.stream()
                                             .map(MessageResponse::getMessageId)
                                             .toList()));
@@ -122,7 +121,7 @@ public class AdvService {
             photo = vkService.savePhoto(photoString, serverString, hash);
         }
         PostResponse postResponse = vkService.postMessageToWall(post, photo);
-        if(postResponse != null && postResponse.getPostId() > 0) {
+        if (postResponse != null && postResponse.getPostId() > 0) {
             //Удаляем пост из предложки только если у нас все ок запостилось на стену
             OkResponse deleteMessageFromSuggestedResponse = vkService.deleteMessageFromSuggested(post);
             sendMessageToTG(post);
@@ -149,13 +148,13 @@ public class AdvService {
             Post post = posts.get(i);
             int postNumber = i + 1;
             String message = "(" + postNumber + " из " + posts.size() + ") ID:" + post.getId() + " " + post.getMessage();
-            List<MessageResponse> responses = telegramBotService.sendMessage(post, message, notesChatId, PostStatus.PUBLISHED);
+            List<MessageResponse> responses = telegramService.sendMessage(post, message, notesChatId, PostStatus.PUBLISHED);
             messageResponseList.addAll(responses);
 
             boolean isLastPost = i == posts.size() - 1;
             if (!responses.isEmpty()) {
                 messageResponseList.addAll(responses);
-                List<MessageResponse> keyboardResponseList = telegramBotService.makeInlineKeyboardAndSendMessage(post, notesChatId);
+                List<MessageResponse> keyboardResponseList = telegramService.makeInlineKeyboardAndSendMessage(post, notesChatId);
                 messageResponseList.addAll(keyboardResponseList);
             }
             //Delay 15 sec
@@ -171,6 +170,6 @@ public class AdvService {
     }
 
     private void sendMessageToTG(Post post) {
-        telegramBotService.sendMessage(post, vkService.getMessageWithUserDataForTg(post), getFreeChatId, PostStatus.PROCESSED);
+        telegramService.sendMessage(post, vkService.getMessageWithUserDataForTg(post), getFreeChatId, PostStatus.PROCESSED);
     }
 }

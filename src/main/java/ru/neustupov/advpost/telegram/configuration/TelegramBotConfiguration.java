@@ -8,17 +8,17 @@ import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 import ru.neustupov.advpost.event.response.BotResponseEventPublisher;
-import ru.neustupov.advpost.telegram.bot.AdvVkPostBot;
+import ru.neustupov.advpost.telegram.bot.TelegramBot;
 
 @Configuration
-public class AdvVkPostBotConfiguration {
+public class TelegramBotConfiguration {
 
     @SneakyThrows
     @Bean
-    public AdvVkPostBot telegramBot(@Value("${bot.key}") String botToken, TelegramBotsApi telegramBotsApi,
-                                    BotResponseEventPublisher botResponseEventPublisher) {
+    public TelegramBot telegramBot(@Value("${bot.key}") String botToken, TelegramBotsApi telegramBotsApi,
+                                   BotResponseEventPublisher botResponseEventPublisher) {
         var botOptions = new DefaultBotOptions();
-        var bot =  new AdvVkPostBot(botOptions, botToken, botResponseEventPublisher);
+        var bot =  new TelegramBot(botOptions, botToken, botResponseEventPublisher);
         telegramBotsApi.registerBot(bot);
         return bot;
     }

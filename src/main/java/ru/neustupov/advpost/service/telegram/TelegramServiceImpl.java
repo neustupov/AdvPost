@@ -1,6 +1,5 @@
 package ru.neustupov.advpost.service.telegram;
 
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.ParseMode;
@@ -21,7 +20,7 @@ import ru.neustupov.advpost.model.PostStatus;
 import ru.neustupov.advpost.model.Attachment;
 import ru.neustupov.advpost.model.Post;
 import ru.neustupov.advpost.service.s3.S3Util;
-import ru.neustupov.advpost.telegram.bot.AdvVkPostBot;
+import ru.neustupov.advpost.telegram.bot.TelegramBot;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -31,19 +30,19 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-public class TelegramBotService {
+public class TelegramServiceImpl implements TelegramService {
 
     private final S3Util s3Util;
-    private final AdvVkPostBot advVkPostBot;
+    private final TelegramBot telegramBot;
     private final ChangePostStatusEventPublisher changePostStatusEventPublisher;
 
-    public TelegramBotService(S3Util s3Util, AdvVkPostBot advVkPostBot, ChangePostStatusEventPublisher changePostStatusEventPublisher) {
+    public TelegramServiceImpl(S3Util s3Util, TelegramBot telegramBot, ChangePostStatusEventPublisher changePostStatusEventPublisher) {
         this.s3Util = s3Util;
-        this.advVkPostBot = advVkPostBot;
+        this.telegramBot = telegramBot;
         this.changePostStatusEventPublisher = changePostStatusEventPublisher;
     }
 
-    @SneakyThrows
+    @Override
     public List<MessageResponse> sendMessage(Post post, String message, String chatId, PostStatus finalStatus) {
 
         List<Attachment> attachments = post.getAttachments();
@@ -59,6 +58,7 @@ public class TelegramBotService {
         return List.of();
     }
 
+    @Override
     public List<MessageResponse> makeInlineKeyboardAndSendMessage(Post post, String chatId) {
         if (post != null) {
             return sendText(chatId, post, "Выберите действие", makeInlineKeyboard(post), PostStatus.PUBLISHED);
@@ -66,6 +66,7 @@ public class TelegramBotService {
         return List.of();
     }
 
+    @Override
     public void deletePostAndKeyboard(String chatId, List<Integer> messageIds) {
         messageIds.forEach(m -> {
             DeleteMessage deleteMessages = DeleteMessage.builder()
@@ -73,7 +74,7 @@ public class TelegramBotService {
                     .messageId(m)
                     .build();
             try {
-                advVkPostBot.execute(deleteMessages);
+                telegramBot.execute(deleteMessages);
                 log.info("Delete message with id = {} from chat with id = {}", m, chatId);
             } catch (TelegramApiException e) {
                 log.error("Can`t delete messages with id = {}", m);
@@ -93,7 +94,7 @@ public class TelegramBotService {
                     .parseMode(ParseMode.MARKDOWN)
                     .build();
 
-            Message execute = advVkPostBot.execute(sendPhoto);
+            Message execute = telegramBot.execute(sendPhoto);
             changePostStatusEventPublisher.publishEvent(post, finalStatus);
             log.info("Send message with text => {}. And one attachment", message);
             MessageResponse messageResponse = new MessageResponse(post, execute);
@@ -136,7 +137,7 @@ public class TelegramBotService {
                 .medias(medias)
                 .build();
         try {
-            List<Message> execute = advVkPostBot.execute(sendMediaGroup);
+            List<Message> execute = telegramBot.execute(sendMediaGroup);
             changePostStatusEventPublisher.publishEvent(post, finalStatus);
             log.info("Send message with text => {}. Count of attachments => {}", message, attachments.size());
             return execute.stream().map(e -> new MessageResponse(post, e)).toList();
@@ -153,7 +154,7 @@ public class TelegramBotService {
             sendMessage.setReplyMarkup(inlineKeyboard);
             sendMessage.setParseMode(ParseMode.MARKDOWN);
             try {
-                Message execute = advVkPostBot.execute(sendMessage);
+                Message execute = telegramBot.execute(sendMessage);
                 if (inlineKeyboard == null) {
                     changePostStatusEventPublisher.publishEvent(post, finalStatus);
                 }

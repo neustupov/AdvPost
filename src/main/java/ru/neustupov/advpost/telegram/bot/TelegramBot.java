@@ -11,11 +11,11 @@ import ru.neustupov.advpost.event.response.BotResponseEventPublisher;
 import ru.neustupov.advpost.model.Command;
 
 @Slf4j
-public class AdvVkPostBot extends TelegramLongPollingBot {
+public class TelegramBot extends TelegramLongPollingBot {
 
     private final BotResponseEventPublisher botResponseEventPublisher;
 
-    public AdvVkPostBot(DefaultBotOptions options, String botToken, BotResponseEventPublisher botResponseEventPublisher) {
+    public TelegramBot(DefaultBotOptions options, String botToken, BotResponseEventPublisher botResponseEventPublisher) {
         super(options, botToken);
         this.botResponseEventPublisher = botResponseEventPublisher;
     }
