@@ -98,6 +98,7 @@ public class TelegramServiceImpl implements TelegramService {
         GetFile getFile = GetFile.builder()
                 .fileId(documentId)
                 .build();
+        //TODO добавить обработку ошибок
         try {
             File file = telegramBot.execute(getFile);
             String filePath = file.getFilePath();
@@ -160,7 +161,8 @@ public class TelegramServiceImpl implements TelegramService {
                 }).collect(Collectors.toList());
 
         InputMedia media = medias.get(0);
-        media.setCaption(message.replaceAll("\\*", "-"));
+        String normalSizeMessage = message.length() > 200 ? message.substring(0, 200) : message;
+        media.setCaption(normalSizeMessage.replaceAll("\\*", "-"));
 
         SendMediaGroup sendMediaGroup = SendMediaGroup.builder()
                 .chatId(chatId)

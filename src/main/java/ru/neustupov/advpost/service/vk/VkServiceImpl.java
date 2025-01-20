@@ -257,8 +257,8 @@ public class VkServiceImpl implements VkService {
     @Override
     public String getMessageWithUserDataForTg(Post post) {
         com.vk.api.sdk.objects.users.responses.GetResponse userGetResponse = getUserData(post);
-        return post.getMessage() + "\n" + "[" + userGetResponse.getFirstName() + " " +
-                userGetResponse.getLastName() + "](https://vk.com/" + userGetResponse.getDomain() + ")";
+        return "[" + userGetResponse.getFirstName() + " " + userGetResponse.getLastName() + "](https://vk.com/" +
+                userGetResponse.getDomain() + ")"  + "\n" + post.getMessage();
     }
 
     private String getMessageWithUserDataForVk(Post post) {

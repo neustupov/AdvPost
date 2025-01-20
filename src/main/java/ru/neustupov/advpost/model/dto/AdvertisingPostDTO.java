@@ -13,4 +13,6 @@ public class AdvertisingPostDTO {
     private String token;
     private LocalDateTime periodFrom;
     private LocalDateTime periodTo;
+    private boolean comments;
+    private Long repostId;
 }
