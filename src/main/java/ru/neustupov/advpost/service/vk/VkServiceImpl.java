@@ -13,6 +13,7 @@ import com.vk.api.sdk.objects.photos.responses.GetWallUploadServerResponse;
 import com.vk.api.sdk.objects.photos.responses.SaveWallPhotoResponse;
 import com.vk.api.sdk.objects.video.VideoFiles;
 import com.vk.api.sdk.objects.video.VideoFull;
+import com.vk.api.sdk.objects.video.VideoImage;
 import com.vk.api.sdk.objects.wall.responses.GetResponse;
 import com.vk.api.sdk.objects.wall.responses.PostResponse;
 import com.vk.api.sdk.queries.wall.WallPostQuery;
@@ -37,12 +38,12 @@ import ru.neustupov.advpost.model.Attachment;
 import ru.neustupov.advpost.model.Post;
 
 import java.io.*;
+import java.net.URI;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.vk.api.sdk.objects.users.Fields;
 import ru.neustupov.advpost.service.watermark.WaterMarkService;
-import ru.neustupov.advpost.service.watermark.WaterMarkServiceImpl;
 
 import static com.vk.api.sdk.objects.wall.GetFilter.SUGGESTS;
 
@@ -109,8 +110,16 @@ public class VkServiceImpl implements VkService {
 
                 VideoFull video = a.getVideo();
                 //TODO добавить обработку видео
-                if(video != null) {
+                if (video != null) {
                     VideoFiles files = video.getFiles();
+                    List<VideoImage> videoImageList = video.getImage();
+                    URI url = videoImageList.get(0).getUrl();
+                    Attachment attachment = Attachment.builder()
+                            .originalId(video.getId())
+                            .originalUri(url.toString())
+                            .type(AttachmentType.PHOTO)
+                            .build();
+                    attachmentList.add(attachment);
                 }
             });
             Post post = Post.builder()
@@ -258,7 +267,7 @@ public class VkServiceImpl implements VkService {
     public String getMessageWithUserDataForTg(Post post) {
         com.vk.api.sdk.objects.users.responses.GetResponse userGetResponse = getUserData(post);
         return "[" + userGetResponse.getFirstName() + " " + userGetResponse.getLastName() + "](https://vk.com/" +
-                userGetResponse.getDomain() + ")"  + "\n" + post.getMessage();
+                userGetResponse.getDomain() + ")" + "\n" + post.getMessage();
     }
 
     private String getMessageWithUserDataForVk(Post post) {
