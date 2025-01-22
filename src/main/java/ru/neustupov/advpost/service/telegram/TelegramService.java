@@ -1,21 +1,23 @@
 package ru.neustupov.advpost.service.telegram;
 
-import org.json.JSONObject;
+import ru.neustupov.advpost.model.AdvertisingPost;
 import ru.neustupov.advpost.model.MessageResponse;
 import ru.neustupov.advpost.model.Post;
-import ru.neustupov.advpost.model.PostStatus;
+import ru.neustupov.advpost.model.dto.AdvertisingPostDTO;
 
 import java.util.List;
 
 public interface TelegramService {
 
-    List<MessageResponse> sendMessage(Post post, String message, String chatId, PostStatus finalStatus);
+    List<MessageResponse> sendMessage(Post post, String message);
 
-    MessageResponse sendMessage(String message, String chatId);
+    MessageResponse sendMessage(String message);
 
-    List<MessageResponse> makeInlineKeyboardAndSendMessage(Post post, String chatId);
+    List<MessageResponse> makeInlineKeyboardAndSendMessage(Post post);
 
-    void deletePostAndKeyboard(String chatId, List<Integer> messageIds);
+    void deletePostAndKeyboard(List<Integer> messageIds);
 
-    JSONObject getDocumentAsJson(String documentId);
+    AdvertisingPostDTO getTextAsDTO(String text);
+
+    MessageResponse sendAdvertisingResponse(AdvertisingPost advPost);
 }

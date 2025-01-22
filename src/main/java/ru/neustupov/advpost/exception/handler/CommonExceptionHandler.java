@@ -1,20 +1,17 @@
 package ru.neustupov.advpost.exception.handler;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import ru.neustupov.advpost.exception.*;
 import ru.neustupov.advpost.service.telegram.TelegramService;
+import ru.neustupov.advpost.service.telegram.channel.ExceptionService;
 
 @ControllerAdvice
 public class CommonExceptionHandler {
 
-    @Value("${chat.exception}")
-    private String exceptionChatId;
-
     private final TelegramService telegramService;
 
-    public CommonExceptionHandler(TelegramService telegramService) {
+    public CommonExceptionHandler(ExceptionService telegramService) {
         this.telegramService = telegramService;
     }
 
@@ -22,7 +19,7 @@ public class CommonExceptionHandler {
             S3ServiceException.class, TelegramServiceException.class, AdvServiceException.class,
             WaterMarkServiceException.class, AdvertisingServiceException.class})
     public Exception handleVkException(Exception exception) {
-        telegramService.sendMessage(exception.getMessage(), exceptionChatId);
+        telegramService.sendMessage(exception.getMessage());
         return exception;
     }
 }
