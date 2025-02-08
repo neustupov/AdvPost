@@ -123,7 +123,7 @@ public class TelegramServiceImpl implements TelegramService {
             SendPhoto sendPhoto = SendPhoto.builder()
                     .chatId(chatId)
                     .photo(photo)
-                    .caption(message)
+                    .caption(message.length() < 200 ? message : message.substring(0,200))
                     .parseMode(ParseMode.MARKDOWN)
                     .build();
 

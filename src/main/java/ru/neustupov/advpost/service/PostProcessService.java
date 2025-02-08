@@ -147,6 +147,9 @@ public class PostProcessService {
             Post post = posts.get(i);
             int postNumber = i + 1;
             String message = "(" + postNumber + " из " + posts.size() + ") ID:" + post.getId() + " " + post.getMessage();
+            if(message.contains("http")) {
+                message = message.substring(0, message.lastIndexOf("http"));
+            }
             List<MessageResponse> responses = telegramService.sendMessage(post, message, moderateChatId, PostStatus.PUBLISHED);
             messageResponseList.addAll(responses);
 
