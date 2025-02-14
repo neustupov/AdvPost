@@ -16,9 +16,6 @@ import ru.neustupov.advpost.model.dto.AdvertisingPhotoDTO;
 import ru.neustupov.advpost.model.dto.AdvertisingPostDTO;
 import ru.neustupov.advpost.service.postgres.*;
 import ru.neustupov.advpost.service.telegram.TelegramService;
-import ru.neustupov.advpost.service.telegram.channel.AdvertisingService;
-import ru.neustupov.advpost.service.telegram.channel.GetFreeService;
-import ru.neustupov.advpost.service.telegram.channel.ModerateService;
 import ru.neustupov.advpost.service.vk.VkService;
 
 import java.time.format.DateTimeFormatter;
@@ -40,9 +37,9 @@ public class PostProcessService {
 
     public PostProcessService(VkService vkService, PostService postService, AttachmentService attachmentService,
                               MessageResponseService messageResponseService,
-                              @Qualifier("AdvertisingService") AdvertisingService advertisingService,
-                              @Qualifier("GetFreeService") GetFreeService getFreeTelegramService,
-                              @Qualifier("ModerateService") ModerateService moderateTelegramService,
+                              @Qualifier("AdvertisingService") TelegramService advertisingService,
+                              @Qualifier("GetFreeService") TelegramService getFreeTelegramService,
+                              @Qualifier("ModerateService") TelegramService moderateTelegramService,
                               AdvertisingPostServiceImpl advertisingPostService) {
         this.vkService = vkService;
         this.postService = postService;
@@ -73,18 +70,29 @@ public class PostProcessService {
 
     public void processBotResponse(Long postId, Command command) {
         boolean result = false;
-        switch (command) {
-            case WITH -> result = postWithWatermark(postId);
-            case WITHOUT -> result = postWithoutWatermark(postId);
-            case REJECT -> result = reject(postId);
-        }
-        if (result) {
-            messageResponseService.findByPostId(postId).ifPresent(responses ->
-                    moderateTelegramService.deletePostAndKeyboard(responses.stream()
-                            .map(MessageResponse::getMessageId)
-                            .toList()));
+        if (postId != null) {
+            switch (command) {
+                case WITH -> result = postWithWatermark(postId);
+                case WITHOUT -> result = postWithoutWatermark(postId);
+                case REJECT -> result = reject(postId);
+            }
+            if (result) {
+                messageResponseService.findByPostId(postId).ifPresent(responses ->
+                        moderateTelegramService.deletePostAndKeyboard(responses.stream()
+                                .map(MessageResponse::getMessageId)
+                                .toList()));
+            } else {
+                log.error("Result of processed command is false");
+            }
         } else {
-            log.error("Result of processed command is false");
+            switch (command) {
+                case START_ADV -> result = advertisingService.sendPreparedMessage();
+            }
+            if (result) {
+                log.info("Command: {} is processed", command);
+            } else {
+                log.error("Result of processed command is false");
+            }
         }
     }
 
@@ -169,7 +177,7 @@ public class PostProcessService {
             String message = "(" + postNumber + " из " + posts.size() + ") ID:" + post.getId() + "\n" +
                     "Дата публикации: " + post.getOriginalDate().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")) +
                     "\n" + post.getMessage();
-            if(message.contains("http")) {
+            if (message.contains("http")) {
                 message = message.substring(0, message.lastIndexOf("http"));
             }
             List<MessageResponse> responses = moderateTelegramService.sendMessage(post, message);

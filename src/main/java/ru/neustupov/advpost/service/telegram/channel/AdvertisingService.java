@@ -78,11 +78,29 @@ public class AdvertisingService extends TelegramServiceImpl {
     }
 
     @Override
+    public boolean sendPreparedMessage() {
+        return sendText(advertisingChatId, makePreparedMessage());
+    }
+
+    @Override
     public void deletePostAndKeyboard(List<Integer> messageIds) {
         throw new TelegramServiceException("Method is not implemented");
     }
 
     private String makeAdvResponseMessage(AdvertisingPost advPost) {
         return "Рекламный пост создан\n" + advPost.toString() + "\n" + "Загрузите фото";
+    }
+
+    private String makePreparedMessage() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Подготовьте и отправьте json вида:").append("\n\n");
+        sb.append("{\n \"message\": \"текст рекламного поста\",\n");
+        sb.append("  \"token\": \"рекламный токен, полученный в ОРД\"\n");
+        sb.append("  \"periodFrom\": \"дата начала публикации в формате дд.мм.гггг\"\n");
+        sb.append("  \"periodTo\": \"дата окончания публикации в формате дд.мм.гггг\"\n");
+        sb.append("  \"time\": \"время публикации в формате чч:мм\"\n");
+        sb.append("  \"comments\": \"false - если необходимо отключить комментарии\"\n");
+        sb.append("  \"repostId\": \"идентификатор сообщения для репоста\"\n}");
+        return sb.toString();
     }
 }
