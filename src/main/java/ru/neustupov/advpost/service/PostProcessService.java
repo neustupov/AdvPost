@@ -21,6 +21,7 @@ import ru.neustupov.advpost.service.telegram.channel.GetFreeService;
 import ru.neustupov.advpost.service.telegram.channel.ModerateService;
 import ru.neustupov.advpost.service.vk.VkService;
 
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -165,7 +166,9 @@ public class PostProcessService {
         for (int i = 0; i < posts.size(); i++) {
             Post post = posts.get(i);
             int postNumber = i + 1;
-            String message = "(" + postNumber + " из " + posts.size() + ") ID:" + post.getId() + " " + post.getMessage();
+            String message = "(" + postNumber + " из " + posts.size() + ") ID:" + post.getId() + "\n" +
+                    "Дата публикации: " + post.getOriginalDate().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")) +
+                    "\n" + post.getMessage();
             if(message.contains("http")) {
                 message = message.substring(0, message.lastIndexOf("http"));
             }

@@ -39,6 +39,8 @@ import ru.neustupov.advpost.model.Post;
 
 import java.io.*;
 import java.net.URI;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -122,8 +124,11 @@ public class VkServiceImpl implements VkService {
                     attachmentList.add(attachment);
                 }
             });
+            LocalDateTime originalDateTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(p.getDate()),
+                    TimeZone.getDefault().toZoneId());
             Post post = Post.builder()
                     .originalPostId(p.getId())
+                    .originalDate(originalDateTime)
                     .ownerId(p.getOwnerId())
                     .fromId(p.getFromId())
                     .message(p.getText().replaceAll("\\*", "-"))
