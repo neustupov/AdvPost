@@ -5,16 +5,20 @@ import com.vk.api.sdk.objects.photos.responses.SaveWallPhotoResponse;
 import com.vk.api.sdk.objects.wall.responses.PostResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import ru.neustupov.advpost.exception.AdvServiceException;
 import ru.neustupov.advpost.exception.VkException;
 import ru.neustupov.advpost.model.*;
-import ru.neustupov.advpost.service.postgres.AttachmentService;
-import ru.neustupov.advpost.service.postgres.MessageResponseService;
-import ru.neustupov.advpost.service.postgres.PostService;
+import ru.neustupov.advpost.model.dto.AdvertisingPhotoDTO;
+import ru.neustupov.advpost.model.dto.AdvertisingPostDTO;
+import ru.neustupov.advpost.service.postgres.*;
 import ru.neustupov.advpost.service.telegram.TelegramService;
+import ru.neustupov.advpost.service.telegram.channel.AdvertisingService;
+import ru.neustupov.advpost.service.telegram.channel.GetFreeService;
+import ru.neustupov.advpost.service.telegram.channel.ModerateService;
 import ru.neustupov.advpost.service.vk.VkService;
 
 import java.util.*;
@@ -24,24 +28,29 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class PostProcessService {
 
-    @Value("${chat.moderate}")
-    private String moderateChatId;
-    @Value("${chat.getFree}")
-    private String getFreeChatId;
-
     private final VkService vkService;
     private final PostService postService;
     private final AttachmentService attachmentService;
     private final MessageResponseService messageResponseService;
-    private final TelegramService telegramService;
+    private final TelegramService advertisingService;
+    private final TelegramService getFreeTelegramService;
+    private final TelegramService moderateTelegramService;
+    private final AdvertisingPostService advertisingPostService;
 
     public PostProcessService(VkService vkService, PostService postService, AttachmentService attachmentService,
-                              MessageResponseService messageResponseService, TelegramService telegramService) {
+                              MessageResponseService messageResponseService,
+                              @Qualifier("AdvertisingService") AdvertisingService advertisingService,
+                              @Qualifier("GetFreeService") GetFreeService getFreeTelegramService,
+                              @Qualifier("ModerateService") ModerateService moderateTelegramService,
+                              AdvertisingPostServiceImpl advertisingPostService) {
         this.vkService = vkService;
         this.postService = postService;
         this.attachmentService = attachmentService;
-        this.telegramService = telegramService;
         this.messageResponseService = messageResponseService;
+        this.advertisingService = advertisingService;
+        this.getFreeTelegramService = getFreeTelegramService;
+        this.moderateTelegramService = moderateTelegramService;
+        this.advertisingPostService = advertisingPostService;
     }
 
     @Scheduled(fixedDelayString = "${interval}")
@@ -69,13 +78,10 @@ public class PostProcessService {
             case REJECT -> result = reject(postId);
         }
         if (result) {
-            //тут обработка после успешного поста\удаления, нужно удалить пост в ТГ и перерисовать клаву
-            messageResponseService.findByPostId(postId)
-                    .ifPresent(responses ->
-                            telegramService.deletePostAndKeyboard(moderateChatId,
-                                    responses.stream()
-                                            .map(MessageResponse::getMessageId)
-                                            .toList()));
+            messageResponseService.findByPostId(postId).ifPresent(responses ->
+                    moderateTelegramService.deletePostAndKeyboard(responses.stream()
+                            .map(MessageResponse::getMessageId)
+                            .toList()));
         } else {
             log.error("Result of processed command is false");
         }
@@ -93,9 +99,22 @@ public class PostProcessService {
         return rejectMessage(checkPostIdAndGet(id)).getValue() == 1;
     }
 
-    public boolean processDocument(String documentId) {
-        JSONObject document = telegramService.getDocumentAsJson(documentId);
+    public boolean processAdvertisingPost(String text, List<PhotoSize> photoIdList, AdvertisingResponseType responseType) {
+        switch (responseType) {
+            case TEXT -> processAdvertisingDocument(advertisingService.getTextAsDTO(text));
+            case PHOTO -> processAdvertisingPhotos(photoIdList);
+        }
         return true;
+    }
+
+    private void processAdvertisingDocument(AdvertisingPostDTO document) {
+        AdvertisingPost advertisingPost = advertisingPostService.processAdvertisingDocument(document);
+        MessageResponse response = advertisingService.sendAdvertisingResponse(advertisingPost);
+    }
+
+    private void processAdvertisingPhotos(List<PhotoSize> photoIdList) {
+        List<AdvertisingPhotoDTO> advPhotoDTOList = List.of();
+        advertisingPostService.processAdvertisingPhotos(advPhotoDTOList);
     }
 
     private Post checkPostIdAndGet(Long id) {
@@ -150,13 +169,13 @@ public class PostProcessService {
             if(message.contains("http")) {
                 message = message.substring(0, message.lastIndexOf("http"));
             }
-            List<MessageResponse> responses = telegramService.sendMessage(post, message, moderateChatId, PostStatus.PUBLISHED);
+            List<MessageResponse> responses = moderateTelegramService.sendMessage(post, message);
             messageResponseList.addAll(responses);
 
             boolean isLastPost = i == posts.size() - 1;
             if (!responses.isEmpty()) {
                 messageResponseList.addAll(responses);
-                List<MessageResponse> keyboardResponseList = telegramService.makeInlineKeyboardAndSendMessage(post, moderateChatId);
+                List<MessageResponse> keyboardResponseList = moderateTelegramService.makeInlineKeyboardAndSendMessage(post);
                 messageResponseList.addAll(keyboardResponseList);
             }
             //Delay 15 sec
@@ -172,6 +191,6 @@ public class PostProcessService {
     }
 
     private void sendMessageToTG(Post post) {
-        telegramService.sendMessage(post, vkService.getMessageWithUserDataForTg(post), getFreeChatId, PostStatus.PROCESSED);
+        getFreeTelegramService.sendMessage(post, vkService.getMessageWithUserDataForTg(post));
     }
 }

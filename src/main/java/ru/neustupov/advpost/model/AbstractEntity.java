@@ -1,9 +1,6 @@
 package ru.neustupov.advpost.model;
 
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -13,9 +10,14 @@ import java.time.LocalDateTime;
 public abstract class AbstractEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @SequenceGenerator(
+            name = "adv_seq",
+            sequenceName = "adv_sequence",
+            allocationSize = 10,
+            initialValue = 3000)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "adv_seq")
+    @Column(name = "id", unique = true, nullable = false)
     protected Long id;
-
     @CreationTimestamp
     private LocalDateTime created;
     @UpdateTimestamp

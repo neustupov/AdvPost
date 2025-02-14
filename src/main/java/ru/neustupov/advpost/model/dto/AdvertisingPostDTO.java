@@ -1,18 +1,24 @@
 package ru.neustupov.advpost.model.dto;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 @Data
 public class AdvertisingPostDTO {
 
-    private List<String> image;
+    @NotNull
     private String text;
+    @NotNull
     private String token;
-    private LocalDateTime periodFrom;
-    private LocalDateTime periodTo;
+    @NotNull
+    private LocalDate periodFrom;
+    @NotNull
+    private LocalDate periodTo;
+    @NotNull
+    private LocalTime time;
     private boolean comments;
     private Long repostId;
 }
