@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -14,6 +15,7 @@ import java.util.List;
 public class Post extends AbstractEntity {
 
     private Integer originalPostId;
+    private LocalDateTime originalDate;
     private Long ownerId;
     private Long fromId;
     @Column(columnDefinition = "text")
@@ -31,6 +33,14 @@ public class Post extends AbstractEntity {
 
     public void setOriginalPostId(Integer originalPostId) {
         this.originalPostId = originalPostId;
+    }
+
+    public LocalDateTime getOriginalDate() {
+        return originalDate;
+    }
+
+    public void setOriginalDate(LocalDateTime originalDate) {
+        this.originalDate = originalDate;
     }
 
     public Long getOwnerId() {

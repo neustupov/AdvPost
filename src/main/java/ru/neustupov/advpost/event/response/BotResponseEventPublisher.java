@@ -19,7 +19,7 @@ public class BotResponseEventPublisher implements ApplicationEventPublisherAware
     }
 
     public void publishEvent(final Long id, final Command command) {
-        log.info("Publishing BotResponseEvent event");
+        log.info("Publishing BotResponseEvent");
         applicationEventPublisher.publishEvent(new BotResponseEvent(this, id, command));
     }
 

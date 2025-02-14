@@ -20,7 +20,7 @@ public class ChangePostStatusEventPublisher implements ApplicationEventPublisher
     }
 
     public void publishEvent(final Post post, final PostStatus nextStatus) {
-        log.info("Publishing ChangePostStatusEvent event");
+        log.info("Publishing ChangePostStatusEvent");
         applicationEventPublisher.publishEvent(new ChangePostStatusEvent(this, post, nextStatus));
     }
 }

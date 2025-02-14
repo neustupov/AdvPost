@@ -15,9 +15,6 @@ spring:
     active: secrets
 
 interval: PT05M
-timeout:
-  connect: 10000
-  read: 10000
 
 management:
   endpoints:
