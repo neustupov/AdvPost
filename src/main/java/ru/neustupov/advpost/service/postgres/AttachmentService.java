@@ -10,4 +10,6 @@ public interface AttachmentService {
     List<Attachment> processAttachments(Post post);
 
     List<Attachment> saveAll(List<Attachment> attachmentList);
+
+    List<Attachment> getOldAttachments();
 }

@@ -45,6 +45,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.vk.api.sdk.objects.users.Fields;
+import ru.neustupov.advpost.service.postgres.AttachmentService;
 import ru.neustupov.advpost.service.watermark.WaterMarkService;
 
 import static com.vk.api.sdk.objects.wall.GetFilter.SUGGESTS;
@@ -64,9 +65,11 @@ public class VkServiceImpl implements VkService {
     private UserActor actor;
     private VkApiClient vk;
     private final WaterMarkService waterMarkService;
+    private final AttachmentService attachmentService;
 
-    public VkServiceImpl(WaterMarkService waterMarkService) {
+    public VkServiceImpl(WaterMarkService waterMarkService, AttachmentService attachmentService) {
         this.waterMarkService = waterMarkService;
+        this.attachmentService = attachmentService;
     }
 
     @PostConstruct
@@ -174,7 +177,7 @@ public class VkServiceImpl implements VkService {
                     uploadFile.setEntity(multipart);
                     count++;
                 }
-
+                attachmentService.saveAll(attachments);
                 try {
                     CloseableHttpResponse response = httpClient.execute(uploadFile);
                     if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {

@@ -15,6 +15,7 @@ import ru.neustupov.advpost.model.*;
 import ru.neustupov.advpost.model.dto.AdvertisingPhotoDTO;
 import ru.neustupov.advpost.model.dto.AdvertisingPostDTO;
 import ru.neustupov.advpost.service.postgres.*;
+import ru.neustupov.advpost.service.s3.S3Service;
 import ru.neustupov.advpost.service.telegram.TelegramService;
 import ru.neustupov.advpost.service.vk.VkService;
 
@@ -34,13 +35,15 @@ public class PostProcessService {
     private final TelegramService getFreeTelegramService;
     private final TelegramService moderateTelegramService;
     private final AdvertisingPostService advertisingPostService;
+    private final S3Service s3Service;
 
     public PostProcessService(VkService vkService, PostService postService, AttachmentService attachmentService,
                               MessageResponseService messageResponseService,
                               @Qualifier("AdvertisingService") TelegramService advertisingService,
                               @Qualifier("GetFreeService") TelegramService getFreeTelegramService,
                               @Qualifier("ModerateService") TelegramService moderateTelegramService,
-                              AdvertisingPostServiceImpl advertisingPostService) {
+                              AdvertisingPostServiceImpl advertisingPostService,
+                              S3Service s3Service) {
         this.vkService = vkService;
         this.postService = postService;
         this.attachmentService = attachmentService;
@@ -49,6 +52,7 @@ public class PostProcessService {
         this.getFreeTelegramService = getFreeTelegramService;
         this.moderateTelegramService = moderateTelegramService;
         this.advertisingPostService = advertisingPostService;
+        this.s3Service = s3Service;
     }
 
     @Scheduled(fixedDelayString = "${interval}")
@@ -66,6 +70,20 @@ public class PostProcessService {
         log.info("Saved posts count = {}", savedPostList.size());
 
         messageResponseService.saveAll(sendMessagesWithDelay(savedPostList));
+    }
+
+    @Scheduled(cron = "0 0 12 * * *")
+    public void deleteUnusedImage() {
+        List<Attachment> oldAttachments = attachmentService.getOldAttachments();
+        List<String> uriList = new ArrayList<>();
+        oldAttachments.forEach(a -> {
+            String s3Uri = a.getS3Uri();
+            if(s3Uri.contains("watermark")) {
+                uriList.add(a.getOriginalUri());
+            }
+            uriList.add(s3Uri);
+        });
+        s3Service.deleteUnusedImage(uriList);
     }
 
     public void processBotResponse(Long postId, Command command) {
