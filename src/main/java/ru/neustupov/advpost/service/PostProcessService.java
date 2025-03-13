@@ -72,7 +72,8 @@ public class PostProcessService {
         messageResponseService.saveAll(sendMessagesWithDelay(savedPostList));
     }
 
-    @Scheduled(cron = "0 0 12 * * *")
+    //TODO нужно добавить deleted поле и проставлять в бд после удаления из s3
+    //@Scheduled(cron = "0 0 12 * * *")
     public void deleteUnusedImage() {
         List<Attachment> oldAttachments = attachmentService.getOldAttachments();
         List<String> uriList = new ArrayList<>();

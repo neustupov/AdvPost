@@ -1,0 +1,30 @@
+version: '3.8'
+services:
+  minio:
+    container_name: minio
+    image: minio/minio
+    environment:
+      MINIO_ACCESS_KEY:
+      MINIO_SECRET_KEY:
+    command: server /data --console-address ":9001"
+    ports:
+      - "9090:9090"
+      - "9011:9011"
+    volumes:
+      - minio_data:/data
+
+  postgres:
+    container_name: postgres
+    image: postgres:alpine
+    environment:
+      POSTGRES_DB:
+      POSTGRES_USER:
+      POSTGRES_PASSWORD:
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  minio_data:
+  postgres_data:
