@@ -20,7 +20,11 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, beans, configprops, env, heapdump, metrics, scheduledtasks
+        include: health, info, beans, configprops, env, heapdump, metrics, scheduledtasks, prometheus
+  metrics:
+    distribution:
+      percentiles-histogram:
+        "{http.server.requests}": true
 
 server:
   port: 9090
