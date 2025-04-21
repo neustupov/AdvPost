@@ -11,10 +11,6 @@ spring:
     database: postgresql
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate.ddl-auto: update
-  profiles:
-    active: secrets
-
-interval: PT05M
 
 management:
   endpoints:
@@ -26,5 +22,5 @@ management:
       percentiles-histogram:
         "{http.server.requests}": true
 
-server:
-  port: 9090
+scheduler:
+  enabled: true
