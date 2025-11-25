@@ -53,6 +53,11 @@ public class ModerateService extends TelegramServiceImpl {
     }
 
     @Override
+    public boolean sendPreparedMessage() {
+        throw new TelegramServiceException("Method is not implemented");
+    }
+
+    @Override
     public List<MessageResponse> sendMessage(Post post, String message) {
         List<Attachment> attachments = post.getAttachments();
         if (attachments != null && !attachments.isEmpty()) {

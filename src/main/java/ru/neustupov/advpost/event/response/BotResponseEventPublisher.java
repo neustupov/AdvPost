@@ -23,4 +23,9 @@ public class BotResponseEventPublisher implements ApplicationEventPublisherAware
         applicationEventPublisher.publishEvent(new BotResponseEvent(this, id, command));
     }
 
+    public void publishEvent(final Command command) {
+        log.info("Publishing BotResponseEvent for start advertising message");
+        applicationEventPublisher.publishEvent(new BotResponseEvent(this, null, command));
+    }
+
 }

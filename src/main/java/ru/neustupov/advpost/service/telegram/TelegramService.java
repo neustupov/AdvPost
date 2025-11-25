@@ -15,6 +15,8 @@ public interface TelegramService {
 
     List<MessageResponse> makeInlineKeyboardAndSendMessage(Post post);
 
+    public boolean sendPreparedMessage();
+
     void deletePostAndKeyboard(List<Integer> messageIds);
 
     AdvertisingPostDTO getTextAsDTO(String text);

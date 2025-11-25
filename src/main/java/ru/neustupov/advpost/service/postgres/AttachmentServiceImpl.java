@@ -13,6 +13,8 @@ import ru.neustupov.advpost.util.S3Util;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Slf4j
@@ -21,6 +23,7 @@ public class AttachmentServiceImpl implements AttachmentService {
 
     public static final String PHOTO_TYPE = "image/jpeg";
     public static final String VIDEO_TYPE = "video/x-msvideo";
+    public static final Long DAYS = 7L;
     private final AttachmentRepository attachmentRepository;
     private final DownloadService downloadService;
     private final S3Util s3Util;
@@ -59,5 +62,12 @@ public class AttachmentServiceImpl implements AttachmentService {
     @Override
     public List<Attachment> saveAll(List<Attachment> attachmentList) {
         return attachmentRepository.saveAll(attachmentList);
+    }
+
+    @Override
+    public List<Attachment> getOldAttachments() {
+        LocalDateTime dateTime = LocalDateTime.now().minus(DAYS, ChronoUnit.DAYS);
+        List<Attachment> attachments = attachmentRepository.findByCreatedBefore(dateTime);
+        return attachments;
     }
 }
