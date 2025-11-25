@@ -12,7 +12,6 @@ import java.net.URI;
 @Slf4j
 @Service
 public class DownloadServiceImpl implements DownloadService {
-
     @Override
     public InputStream downloadAsInputStream(URI uri) {
         try (InputStream is = uri.toURL().openStream()) {

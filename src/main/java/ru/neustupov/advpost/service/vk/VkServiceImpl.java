@@ -70,6 +70,9 @@ public class VkServiceImpl implements VkService {
     public VkServiceImpl(WaterMarkService waterMarkService, AttachmentService attachmentService) {
         this.waterMarkService = waterMarkService;
         this.attachmentService = attachmentService;
+
+        System.setProperty("api.host", "api.vk.ru");
+        System.setProperty("oauth.host", "oauth.vk.ru");
     }
 
     @PostConstruct

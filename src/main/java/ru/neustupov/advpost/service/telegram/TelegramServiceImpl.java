@@ -83,16 +83,17 @@ public abstract class TelegramServiceImpl implements TelegramService {
         try (InputStream inputStream = s3Util.download(s3Uri)) {
             InputFile photo = new InputFile();
             photo.setMedia(inputStream, String.valueOf(attachment.getOriginalId()));
+            String msg = message.replaceAll("_", "-");
             SendPhoto sendPhoto = SendPhoto.builder()
                     .chatId(chatId)
                     .photo(photo)
-                    .caption(message.length() < 200 ? message : message.substring(0, 200))
+                    .caption(msg.length() < 200 ? msg : msg.substring(0, 200))
                     .parseMode(ParseMode.MARKDOWN)
                     .build();
 
             Message execute = telegramBot.execute(sendPhoto);
             changePostStatusEventPublisher.publishEvent(post, finalStatus);
-            log.info("Send message with text => {}. And one attachment", message);
+            log.info("Send message with text => {}. And one attachment", msg);
             MessageResponse messageResponse = new MessageResponse(post, execute);
             return List.of(messageResponse);
         } catch (IOException e) {

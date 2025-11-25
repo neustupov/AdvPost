@@ -180,7 +180,7 @@ public class PostProcessService {
         PostResponse response = vkService.postMessageFromSuggested(post);
         sendMessageToTG(post);
 
-        //если что то пошло не так = false
+        //если что-то пошло не так = false
         return true;
     }
 
@@ -199,7 +199,7 @@ public class PostProcessService {
             if (message.contains("http")) {
                 message = message.substring(0, message.lastIndexOf("http"));
             }
-            List<MessageResponse> responses = moderateTelegramService.sendMessage(post, message);
+            List<MessageResponse> responses = moderateTelegramService.sendMessage(post, message.replaceAll("_", "-"));
             messageResponseList.addAll(responses);
 
             boolean isLastPost = i == posts.size() - 1;
@@ -221,6 +221,6 @@ public class PostProcessService {
     }
 
     private void sendMessageToTG(Post post) {
-        getFreeTelegramService.sendMessage(post, vkService.getMessageWithUserDataForTg(post));
+        getFreeTelegramService.sendMessage(post, vkService.getMessageWithUserDataForTg(post).replaceAll("_", "-"));
     }
 }
