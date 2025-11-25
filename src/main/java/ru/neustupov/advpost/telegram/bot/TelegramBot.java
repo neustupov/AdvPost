@@ -16,6 +16,8 @@ import ru.neustupov.advpost.model.Command;
 
 import java.util.List;
 
+import static ru.neustupov.advpost.model.Command.START_ADV;
+
 @Slf4j
 public class TelegramBot extends TelegramLongPollingBot {
 
@@ -76,7 +78,11 @@ public class TelegramBot extends TelegramLongPollingBot {
         Message channelPost = update.getChannelPost();
         String postText = channelPost.getText();
         //Document document = channelPost.getDocument();
-        List<PhotoSize> postPhoto = channelPost.getPhoto();
-        documentUploadEventPublisher.publishEvent(postText, postPhoto);
+        if(postText.equals("/start")) {
+            botResponseEventPublisher.publishEvent(START_ADV);
+        } else {
+            List<PhotoSize> postPhoto = channelPost.getPhoto();
+            documentUploadEventPublisher.publishEvent(postText, postPhoto);
+        }
     }
 }

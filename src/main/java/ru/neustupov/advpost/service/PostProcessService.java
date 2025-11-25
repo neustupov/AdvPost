@@ -15,10 +15,8 @@ import ru.neustupov.advpost.model.*;
 import ru.neustupov.advpost.model.dto.AdvertisingPhotoDTO;
 import ru.neustupov.advpost.model.dto.AdvertisingPostDTO;
 import ru.neustupov.advpost.service.postgres.*;
+import ru.neustupov.advpost.service.s3.S3Service;
 import ru.neustupov.advpost.service.telegram.TelegramService;
-import ru.neustupov.advpost.service.telegram.channel.AdvertisingService;
-import ru.neustupov.advpost.service.telegram.channel.GetFreeService;
-import ru.neustupov.advpost.service.telegram.channel.ModerateService;
 import ru.neustupov.advpost.service.vk.VkService;
 
 import java.time.format.DateTimeFormatter;
@@ -37,13 +35,15 @@ public class PostProcessService {
     private final TelegramService getFreeTelegramService;
     private final TelegramService moderateTelegramService;
     private final AdvertisingPostService advertisingPostService;
+    private final S3Service s3Service;
 
     public PostProcessService(VkService vkService, PostService postService, AttachmentService attachmentService,
                               MessageResponseService messageResponseService,
-                              @Qualifier("AdvertisingService") AdvertisingService advertisingService,
-                              @Qualifier("GetFreeService") GetFreeService getFreeTelegramService,
-                              @Qualifier("ModerateService") ModerateService moderateTelegramService,
-                              AdvertisingPostServiceImpl advertisingPostService) {
+                              @Qualifier("AdvertisingService") TelegramService advertisingService,
+                              @Qualifier("GetFreeService") TelegramService getFreeTelegramService,
+                              @Qualifier("ModerateService") TelegramService moderateTelegramService,
+                              AdvertisingPostServiceImpl advertisingPostService,
+                              S3Service s3Service) {
         this.vkService = vkService;
         this.postService = postService;
         this.attachmentService = attachmentService;
@@ -52,6 +52,7 @@ public class PostProcessService {
         this.getFreeTelegramService = getFreeTelegramService;
         this.moderateTelegramService = moderateTelegramService;
         this.advertisingPostService = advertisingPostService;
+        this.s3Service = s3Service;
     }
 
     @Scheduled(fixedDelayString = "${interval}")
@@ -71,20 +72,46 @@ public class PostProcessService {
         messageResponseService.saveAll(sendMessagesWithDelay(savedPostList));
     }
 
+    //TODO нужно добавить deleted поле и проставлять в бд после удаления из s3
+    //@Scheduled(cron = "0 0 12 * * *")
+    public void deleteUnusedImage() {
+        List<Attachment> oldAttachments = attachmentService.getOldAttachments();
+        List<String> uriList = new ArrayList<>();
+        oldAttachments.forEach(a -> {
+            String s3Uri = a.getS3Uri();
+            if(s3Uri.contains("watermark")) {
+                uriList.add(a.getOriginalUri());
+            }
+            uriList.add(s3Uri);
+        });
+        s3Service.deleteUnusedImage(uriList);
+    }
+
     public void processBotResponse(Long postId, Command command) {
         boolean result = false;
-        switch (command) {
-            case WITH -> result = postWithWatermark(postId);
-            case WITHOUT -> result = postWithoutWatermark(postId);
-            case REJECT -> result = reject(postId);
-        }
-        if (result) {
-            messageResponseService.findByPostId(postId).ifPresent(responses ->
-                    moderateTelegramService.deletePostAndKeyboard(responses.stream()
-                            .map(MessageResponse::getMessageId)
-                            .toList()));
+        if (postId != null) {
+            switch (command) {
+                case WITH -> result = postWithWatermark(postId);
+                case WITHOUT -> result = postWithoutWatermark(postId);
+                case REJECT -> result = reject(postId);
+            }
+            if (result) {
+                messageResponseService.findByPostId(postId).ifPresent(responses ->
+                        moderateTelegramService.deletePostAndKeyboard(responses.stream()
+                                .map(MessageResponse::getMessageId)
+                                .toList()));
+            } else {
+                log.error("Result of processed command is false");
+            }
         } else {
-            log.error("Result of processed command is false");
+            switch (command) {
+                case START_ADV -> result = advertisingService.sendPreparedMessage();
+            }
+            if (result) {
+                log.info("Command: {} is processed", command);
+            } else {
+                log.error("Result of processed command is false");
+            }
         }
     }
 
@@ -153,7 +180,7 @@ public class PostProcessService {
         PostResponse response = vkService.postMessageFromSuggested(post);
         sendMessageToTG(post);
 
-        //если что то пошло не так = false
+        //если что-то пошло не так = false
         return true;
     }
 
@@ -169,10 +196,10 @@ public class PostProcessService {
             String message = "(" + postNumber + " из " + posts.size() + ") ID:" + post.getId() + "\n" +
                     "Дата публикации: " + post.getOriginalDate().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")) +
                     "\n" + post.getMessage();
-            if(message.contains("http")) {
+            if (message.contains("http")) {
                 message = message.substring(0, message.lastIndexOf("http"));
             }
-            List<MessageResponse> responses = moderateTelegramService.sendMessage(post, message);
+            List<MessageResponse> responses = moderateTelegramService.sendMessage(post, message.replaceAll("_", "-"));
             messageResponseList.addAll(responses);
 
             boolean isLastPost = i == posts.size() - 1;
@@ -194,6 +221,6 @@ public class PostProcessService {
     }
 
     private void sendMessageToTG(Post post) {
-        getFreeTelegramService.sendMessage(post, vkService.getMessageWithUserDataForTg(post));
+        getFreeTelegramService.sendMessage(post, vkService.getMessageWithUserDataForTg(post).replaceAll("_", "-"));
     }
 }

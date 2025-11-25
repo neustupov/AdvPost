@@ -4,5 +4,6 @@ public enum Command {
 
     WITH,
     WITHOUT,
-    REJECT;
+    REJECT,
+    START_ADV;
 }

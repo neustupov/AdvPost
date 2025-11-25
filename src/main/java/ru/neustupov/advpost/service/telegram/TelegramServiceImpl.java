@@ -16,7 +16,10 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.neustupov.advpost.event.status.ChangePostStatusEventPublisher;
 import ru.neustupov.advpost.exception.TelegramServiceException;
@@ -80,16 +83,17 @@ public abstract class TelegramServiceImpl implements TelegramService {
         try (InputStream inputStream = s3Util.download(s3Uri)) {
             InputFile photo = new InputFile();
             photo.setMedia(inputStream, String.valueOf(attachment.getOriginalId()));
+            String msg = message.replaceAll("_", "-");
             SendPhoto sendPhoto = SendPhoto.builder()
                     .chatId(chatId)
                     .photo(photo)
-                    .caption(message.length() < 200 ? message : message.substring(0,200))
+                    .caption(msg.length() < 200 ? msg : msg.substring(0, 200))
                     .parseMode(ParseMode.MARKDOWN)
                     .build();
 
             Message execute = telegramBot.execute(sendPhoto);
             changePostStatusEventPublisher.publishEvent(post, finalStatus);
-            log.info("Send message with text => {}. And one attachment", message);
+            log.info("Send message with text => {}. And one attachment", msg);
             MessageResponse messageResponse = new MessageResponse(post, execute);
             return List.of(messageResponse);
         } catch (IOException e) {
@@ -106,7 +110,7 @@ public abstract class TelegramServiceImpl implements TelegramService {
                     try (InputStream inputStream = s3Util.download(s3Uri)) {
                         String mediaName = UUID.randomUUID().toString();
                         byte[] allBytes = inputStream.readAllBytes();
-                        try(ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(allBytes)) {
+                        try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(allBytes)) {
                             return (InputMedia) InputMediaPhoto.builder()
                                     .media("attach://" + mediaName)
                                     .mediaName(mediaName)
@@ -139,21 +143,36 @@ public abstract class TelegramServiceImpl implements TelegramService {
     }
 
     protected List<MessageResponse> sendText(String chatId, Post post, String message, InlineKeyboardMarkup inlineKeyboard, PostStatus finalStatus) {
-            SendMessage sendMessage = new SendMessage();
-            sendMessage.setChatId(chatId);
-            sendMessage.setText(message);
-            sendMessage.setReplyMarkup(inlineKeyboard);
-            sendMessage.setParseMode(ParseMode.MARKDOWN);
-            try {
-                Message execute = telegramBot.execute(sendMessage);
-                if (inlineKeyboard == null) {
-                    changePostStatusEventPublisher.publishEvent(post, finalStatus);
-                }
-                log.info("Send message with text = {}", message);
-                return List.of(new MessageResponse(post, execute));
-            } catch (TelegramApiException e) {
-                throw new TelegramServiceException("Can't send photos with media group. Error- > " + e.getMessage(), e);
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setChatId(chatId);
+        sendMessage.setText(message);
+        sendMessage.setReplyMarkup(inlineKeyboard);
+        sendMessage.setParseMode(ParseMode.MARKDOWN);
+        try {
+            Message execute = telegramBot.execute(sendMessage);
+            if (inlineKeyboard == null) {
+                changePostStatusEventPublisher.publishEvent(post, finalStatus);
             }
+            log.info("Send message with text = {}", message);
+            return List.of(new MessageResponse(post, execute));
+        } catch (TelegramApiException e) {
+            throw new TelegramServiceException("Can't send photos with media group. Error- > " + e.getMessage(), e);
+        }
+    }
+
+    protected boolean sendText(String chatId, String message) {
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setChatId(chatId);
+        sendMessage.setText(message);
+        sendMessage.setParseMode(ParseMode.HTML);
+        sendMessage.setReplyToMessageId(1);
+        try {
+            Message execute = telegramBot.execute(sendMessage);
+            log.info("Send message with text = {}", message);
+            return execute.getMessageId() != null;
+        } catch (TelegramApiException e) {
+            throw new TelegramServiceException("Can't send photos with media group. Error- > " + e.getMessage(), e);
+        }
     }
 
     protected MessageResponse sendTextWithoutKeyboard(String message, String chatId) {

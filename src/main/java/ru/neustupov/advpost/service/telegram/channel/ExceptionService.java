@@ -44,6 +44,11 @@ public class ExceptionService extends TelegramServiceImpl {
     }
 
     @Override
+    public boolean sendPreparedMessage() {
+        throw new TelegramServiceException("Method is not implemented");
+    }
+
+    @Override
     public void deletePostAndKeyboard(List<Integer> messageIds) {
         throw new TelegramServiceException("Method is not implemented");
     }
