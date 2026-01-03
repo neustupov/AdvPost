@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Просмотр MessageResponse #[[${response.id}]]</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Ответ Telegram #[[${response.id}]]</h4>
+                    <a th:href="@{/messageresponses}" class="btn btn-sm btn-light">
+                        <i class="bi bi-arrow-left"></i>
+                    </a>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless">
+                        <tr>
+                            <th width="40%">ID в БД</th>
+                            <td th:text="${response.id}">—</td>
+                        </tr>
+                        <tr>
+                            <th>Post ID</th>
+                            <td th:text="${response.postId}">—</td>
+                        </tr>
+                        <tr>
+                            <th>Message ID (Telegram)</th>
+                            <td th:text="${response.messageId}">—</td>
+                        </tr>
+                        <tr>
+                            <th>Создан</th>
+                            <td th:text="${response.created != null ? #temporals.format(response.created, 'dd.MM.yyyy HH:mm:ss') : '—'}">—</td>
+                        </tr>
+                        <tr>
+                            <th>Обновлён</th>
+                            <td th:text="${response.updated != null ? #temporals.format(response.updated, 'dd.MM.yyyy HH:mm:ss') : '—'}">—</td>
+                        </tr>
+                    </table>
+
+                    <div class="mt-4 d-flex gap-2">
+                        <a th:href="@{/messageresponses/{id}/edit(id=${response.id})}" class="btn btn-warning">
+                            <i class="bi bi-pencil"></i> Редактировать
+                        </a>
+                        <form th:action="@{/messageresponses/{id}/delete(id=${response.id})}" method="post" style="display:inline;">
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('Удалить навсегда?');">
+                                <i class="bi bi-trash"></i> Удалить
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,6 +1,8 @@
 package ru.neustupov.advpost.service.postgres;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import ru.neustupov.advpost.model.PostStatus;
 import ru.neustupov.advpost.model.Post;
@@ -14,10 +16,10 @@ import java.util.Optional;
 @Service
 public class PostServiceImpl implements PostService {
 
-    private final PostRepository postRepository;
+    private final PostRepository repository;
 
-    public PostServiceImpl(PostRepository postRepository) {
-        this.postRepository = postRepository;
+    public PostServiceImpl(PostRepository repository) {
+        this.repository = repository;
     }
 
     @Override
@@ -31,12 +33,12 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public Optional<Post> findById(Long id) {
-        return postRepository.findById(id);
+        return repository.findById(id);
     }
 
     @Override
     public List<Post> saveAll(List<Post> postList) {
-        return postRepository.saveAll(postList);
+        return repository.saveAll(postList);
     }
 
     @Override
@@ -49,6 +51,21 @@ public class PostServiceImpl implements PostService {
     }
 
     private Optional<Post> findByHashAndStatusNotIn(String hash) {
-        return postRepository.findByHashAndStatus(hash).flatMap(posts -> posts.stream().findFirst());
+        return repository.findByHashAndStatus(hash).flatMap(posts -> posts.stream().findFirst());
+    }
+
+    @Override
+    public Page<Post> findAll(Pageable pageable) {
+        return repository.findAll(pageable);
+    }
+
+    @Override
+    public void save(Post post) {
+        repository.save(post);
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        repository.deleteById(id);
     }
 }

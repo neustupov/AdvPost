@@ -1,8 +1,17 @@
+server:
+  port: 8080                                  # ← пользователи и фронт
+  servlet:
+    context-path: /
+
 spring:
   boot:
     admin:
       client:
-        url: http://localhost:9090
+        url: http://localhost:9090          # ← SBA Server
+        instance:
+          name: ${spring.application.name}
+          service-url: http://localhost:8080
+          health-url: http://localhost:8081/actuator/health
   application:
     name: AdvPost
   datasource:
@@ -13,14 +22,22 @@ spring:
     hibernate.ddl-auto: update
 
 management:
+  server:
+    port: 8081
+    address: 0.0.0.0
   endpoints:
     web:
+      base-path: /actuator
       exposure:
-        include: health, info, beans, configprops, env, heapdump, metrics, scheduledtasks, prometheus
+        include: health, info, beans, configprops, env, heapdump, metrics, scheduledtasks, prometheus, threaddump, heapdump
   metrics:
     distribution:
       percentiles-histogram:
-        "{http.server.requests}": true
+        http.server.requests: true
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
 
 scheduler:
   enabled: true

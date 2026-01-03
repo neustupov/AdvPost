@@ -1,6 +1,8 @@
 package ru.neustupov.advpost.service.postgres;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import ru.neustupov.advpost.model.MessageResponse;
 import ru.neustupov.advpost.repository.MessageResponseRepository;
@@ -12,19 +14,39 @@ import java.util.Optional;
 @Service
 public class MessageResponseServiceImpl implements MessageResponseService {
 
-    private final MessageResponseRepository messageResponseRepository;
+    private final MessageResponseRepository repository;
 
-    public MessageResponseServiceImpl(MessageResponseRepository messageResponseRepository) {
-        this.messageResponseRepository = messageResponseRepository;
+    public MessageResponseServiceImpl(MessageResponseRepository repository) {
+        this.repository = repository;
     }
 
     @Override
     public Optional<List<MessageResponse>> findByPostId(Long postId) {
-        return messageResponseRepository.findByPostId(postId);
+        return repository.findByPostId(postId);
     }
 
     @Override
     public List<MessageResponse> saveAll(List<MessageResponse> messageResponseList) {
-        return messageResponseRepository.saveAll(messageResponseList);
+        return repository.saveAll(messageResponseList);
+    }
+
+    @Override
+    public Optional<MessageResponse> findById(Long id) {
+        return repository.findById(id);
+    }
+
+    @Override
+    public Page<MessageResponse> findAll(Pageable pageable) {
+        return repository.findAll(pageable);
+    }
+
+    @Override
+    public void save(MessageResponse messageResponse) {
+        repository.save(messageResponse);
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        repository.deleteById(id);
     }
 }

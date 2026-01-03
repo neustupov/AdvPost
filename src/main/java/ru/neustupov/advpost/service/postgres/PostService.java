@@ -1,5 +1,7 @@
 package ru.neustupov.advpost.service.postgres;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import ru.neustupov.advpost.model.Post;
 import ru.neustupov.advpost.model.PostStatus;
 
@@ -15,4 +17,10 @@ public interface PostService {
     List<Post> saveAll(List<Post> postList);
 
     void changeStatus(List<Post> postList, PostStatus nextStatus);
+
+    Page<Post> findAll(Pageable pageable);
+
+    void save(Post post);
+
+    void deleteById(Long id);
 }

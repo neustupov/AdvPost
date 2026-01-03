@@ -20,7 +20,9 @@ public class DownloadServiceImpl implements DownloadService {
             log.info("Download file with size = {}", allBytes.length);
             return new ByteArrayInputStream(allBytes);
         } catch (IOException e) {
-            throw new DownloadServiceException(e.getMessage(), e);
+            log.error("File with URI: {} is not found in VK", uri);
+            //throw new DownloadServiceException(e.getMessage(), e);
         }
+        return null;
     }
 }
